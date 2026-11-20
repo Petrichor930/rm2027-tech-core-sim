@@ -1,4 +1,4 @@
-# 运行依赖（Python 3.9~3.12 均可；MuJoCo 自带二进制，无需系统库）
+# 运行依赖（Python 3.8+ 均可（自动查找）；MuJoCo 自带二进制，无需系统库）
 mujoco==3.2.3
 glfw>=2.5
 PyOpenGL>=3.1
