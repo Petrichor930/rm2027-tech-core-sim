@@ -13,13 +13,13 @@ if not exist .venv (
 )
 
 echo [2/3] 安装依赖 ...
-.venv\Scripts\python.exe -m pip install --upgrade pip -q
-.venv\Scripts\python.exe -m pip install -r requirements.txt -q || (echo [错误] 依赖安装失败 & pause & exit /b 1)
+".venv/Scripts/python.exe" -m pip install --upgrade pip -q
+".venv/Scripts/python.exe" -m pip install -r requirements.txt -q || (echo [错误] 依赖安装失败 & pause & exit /b 1)
 
 echo [3/3] 自检（无头验证）...
-.venv\Scripts\python.exe verify_steps.py || (echo [错误] 自检失败 & pause & exit /b 1)
+".venv/Scripts/python.exe" src/verify_steps.py || (echo [错误] 自检失败 & pause & exit /b 1)
 
 echo.
 echo ================= 安装完成 =================
-echo 运行仿真:  run.bat   （或 .venv\Scripts\python.exe assemble_view.py）
+echo 运行仿真:  run.bat   （或 .venv/Scripts/python.exe src/assemble_view.py）
 pause

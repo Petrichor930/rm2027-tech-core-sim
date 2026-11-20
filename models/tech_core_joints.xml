@@ -3,7 +3,7 @@
        J1 底座回转(垂直) → J2 肩俯仰 → J3 肘俯仰 → J4 腕回转 → J5 腕俯仰 → J6 法兰回转 → 鼓
        鼓上带装配柱链：j_slide(滑槽100mm) → j_p(翻板 0..90°) → j_q(自旋 ±90°, 弹簧回正0.3N·m)
        q=0 时各臂节保持 CAD 原始位形（mesh 坐标 = world 坐标） -->
-  <compiler angle="degree" meshdir="assets"/>
+  <compiler angle="degree" meshdir="../assets"/>
 
   <option gravity="0 0 -9.81"/>
 

@@ -1,26 +1,44 @@
-# 说明书：RoboMaster 2027 科技核心 & 能量单元 MuJoCo 仿真
+# RoboMaster 2027 科技核心 & 能量单元 MuJoCo 仿真
 
-> 一句话：从官方 STEP 提取科技核心（六轴机械臂+鼓+装配柱）与能量单元，做成 MuJoCo 模型，
-> 可动六关节、可手动位姿、可测量距离，并实现规则 5.4.3 的六步装配流程仿真。
-> 开发交接与踩坑记录见 `HANDOFF.md`（本文件面向使用者）。
+> 从官方 STEP 提取科技核心（六轴机械臂+鼓+装配柱）与能量单元，做成 MuJoCo 模型：
+> 六关节可动、位姿实时读数、距离测量工具，并实现规则 5.4.3 六步装配流程仿真。
+> 网格资产来自大疆官方 RMUC2027 装配体，仅供 RoboMaster 赛季学习交流使用。
 
----
+## 0. 仓库结构
+
+```
+rm2027-tech-core-sim/
+├── README.md            说明书（本文件）
+├── requirements.txt     Python 依赖
+├── setup.bat/.ps1       一键安装（建 .venv + 装依赖 + 自检）
+├── run.bat              一键运行仿真
+├── models/              MJCF 模型
+│   ├── tech_core_joints.xml        主模型（六轴臂 + 装配柱 + 能量单元）
+│   └── tech_core_energy_unit.xml   v1 整体模型（保留）
+├── src/                 运行程序
+│   ├── assemble_view.py     ★交互仿真主程序
+│   ├── verify_steps.py      无头验证（安装自检用）
+│   ├── view_model.py        v1 查看器
+│   └── verify_model.py      v1 验证
+├── tools/               数据管线与分析（在仓库根目录运行）
+├── assets/              网格资产（STL + 几何常量）
+├── output/              运行输出（截图，不入库）
+└── docs/                内部文档（不入库）
+```
 
 ## 1. 安装与快速开始
 
 | 步骤 | 操作 | 说明 |
 |---|---|---|
 | ① 安装（仅一次） | 双击 `setup.bat` | 自动：建 .venv 虚拟环境 → 装依赖 → 无头自检（全绿=成功） |
-| ② 运行仿真 | 双击 `run.bat` | 等价于 `.venv\Scripts\python.exe assemble_view.py` |
-| ③ 验证环境 | `.venv\Scripts\python.exe verify_steps.py` | 输出 asm_s*.png 截图、全部 [OK] 即正常 |
+| ② 运行仿真 | 双击 `run.bat` | 等价于 `.venv/Scripts/python.exe src/assemble_view.py` |
+| ③ 验证环境 | `.venv/Scripts/python.exe src/verify_steps.py` | 输出 output/*.png、全部 [OK] 即正常 |
 | 三分钟走完装配 | `3`→`F`→`G`→`W`→`W`→`D`→`D`→`Enter` | 选 L3→开始→对准→插入→上移→绕P→绕Q→确认 |
 
-> 要求：Windows 10+、Python 3.9+（在 PATH 中）。HUD 字体用微软雅黑（`C:/Windows/Fonts/msyh.ttc`），目标平台为 Windows。
-> 也可用 PowerShell：`powershell -ExecutionPolicy Bypass -File setup.ps1`。
+> 要求：Windows 10+、Python 3.9+（在 PATH 中）。HUD 字体用微软雅黑，目标平台 Windows。
+> PowerShell 版：`powershell -ExecutionPolicy Bypass -File setup.ps1`。
 
----
-
-## 2. 主程序操作总表（assemble_view.py）
+## 2. 主程序操作总表（src/assemble_view.py）
 
 | 按键 | 功能 | 备注 |
 |---|---|---|
@@ -34,23 +52,21 @@
 | `X` | 取出能量单元（装配失败） | 规则允许 ≤10N 拔出 |
 | `Enter` | 步骤 6 确认装配 | 成功显示 ★SUCCESS |
 | `←→` `↑↓` `R` | 机械臂模式：选关节 / ±1° / 全部归零 | J1~J6 循环选择 |
-| `T` | 数字输入六关节角 | 输入 `J1 J2 J3 J4 J5 J6`（°），如 `0 30 -20 0 0 0` |
-| `M` / `N` | 测量工具开/关 / 清测点 | 点击两表面点，出 \|AB\| 斜边 + Δx/Δy/Δz 直角边（rule 笛卡尔系），3D 画橙色斜边+灰色折线 |
+| `T` | 数字输入六关节角 | 输入 J1 J2 J3 J4 J5 J6（度），如 `0 30 -20 0 0 0` |
+| `M` / `N` | 测量工具开/关 / 清测点 | 点两表面点，出斜边 |AB| + 直角边 Δx/Δy/Δz（rule 笛卡尔系） |
 | 鼠标左/右/中 | 能量单元平移/旋转/升降 | 未锁定时可用；测量模式下左键=取点 |
 | 相机模式鼠标 | 左=旋转 右=平移 滚轮=缩放 | |
 | `Backspace` | 全部重置 | 保留机械臂当前角度 |
-| `P` / `H` / `Esc` | 截图 / HUD 开关 / 退出 | 截图存 asm_shot_*.png |
+| `P` / `H` / `Esc` | 截图 / HUD 开关 / 退出 | 截图存 output/ |
 
 HUD 每帧显示：下一步提示（▶ 行）、位姿读数 (x,y,z,θ,φ,α)、六关节角、步骤进度、对准状态、力矩信息、测量结果。
 
----
-
 ## 3. 六步装配流程（规则手册 5.4.3）
 
-| 步骤 | 动作 | 仿真按键 | 完成判定 | 难度要求 |
+| 步骤 | 动作 | 按键 | 完成判定 | 要求 |
 |---|---|---|---|---|
 | 1 | 选择装配难度 | `1`~`4` | — | 全部 |
-| 2 | 能量单元正面对准装配柱，沿 −x 插入 **100mm**（销轴穿入 Ø40 口抵到腔内铁片） | `G`→`W` | 插入 ≥100mm 自动锁定 | L1-L4 |
+| 2 | 正面 Ø40 口对准装配柱，沿 -x 插入 **100mm**（销轴抵到腔内铁片） | `G`→`W` | ≥100mm 自动锁定 | L1-L4 |
 | 3 | 沿 +z 上移 **100mm**（滑架在鼓面滑槽上滑） | `W` | ≥100mm | L2-L4 |
 | 4 | 绕 **P 轴**向上转 **90°**（销轴+方板一体翻起） | `D` | ≥89.5° | L3-L4 |
 | 5 | 绕 **Q 轴**转至指定角度（弹簧回正 0.3N·m，2s 后 0.5N·m 保持） | `A/D` | 停留 0.3~0.5s | L3-L4 |
@@ -63,124 +79,102 @@ HUD 每帧显示：下一步提示（▶ 行）、位姿读数 (x,y,z,θ,φ,α)�
 | L3 | 1,2,3,4,5,6 | 全流程 |
 | L4 | 全部 + 双核 5s 同步 | **未实现**，现按 L3 演示 |
 
----
-
 ## 4. 核心文件
 
-| 文件 | 类型 | 作用 |
-|---|---|---|
-| `assemble_view.py` | **主程序** | 交互查看器：六轴臂点动、六步装配状态机、测量工具、中文 HUD |
-| `tech_core_joints.xml` | **模型** | 多关节 MJCF：六轴臂链 + 装配柱链（滑槽/翻板/自旋）+ 能量单元 |
-| `verify_steps.py` | 验证 | 无头验证：零位精度、六关节运动、插入锁定、跟随（通过=全绿） |
-| `split_arm.py` | 拆分 | 整体 STL → 底座+5 臂节+鼓（连通域+PCA 关节轴拟合），可复跑 |
-| `split_column.py` | 拆分 | 整体 STL → 滑架/销轴，输出销轴几何常量 |
-| `HANDOFF.md` | 文档 | 开发交接：机制结论、坐标推导、13 条踩坑、待办 |
-| `README.md` | 文档 | 本说明书 |
+| 文件 | 作用 |
+|---|---|
+| `src/assemble_view.py` | ★交互仿真：六轴臂点动、六步装配状态机、测量工具、中文 HUD |
+| `models/tech_core_joints.xml` | 多关节 MJCF：六轴臂链 + 装配柱链（滑槽/翻板/自旋）+ 能量单元 |
+| `src/verify_steps.py` | 无头验证：零位精度、六关节运动、插入锁定、跟随 |
+| `tools/split_arm.py` | 整体 STL → 底座+5 臂节+鼓（连通域 + PCA 关节轴拟合），可复跑 |
+| `tools/split_column.py` | 整体 STL → 滑架/销轴 + 几何常量 |
 
 ### 资产（assets/）
 
-| 文件 | 内容 | 尺寸 / 面数 |
+| 文件 | 内容 | 面数 |
 |---|---|---|
-| `arm_base.stl` | 底座（静态） | 14,968 面 |
-| `arm_l1.stl` ~ `arm_l5.stl` | 臂节（随 J1~J5 转） | 12.6k / 8.4k / 2.0k / 2.0k / 11.9k 面 |
-| `arm_drum.stl` | 六边形鼓（随 J6 转） | 72,010 面 |
-| `col_carriage.stl` | 方形 MARK 板/翻板（滑槽+P 翻转） | 2,009 面 |
-| `col_pin.stl` | 装配柱销轴（Q 自旋） | 3,874 面 |
+| `arm_base.stl` | 底座（静态） | 14,968 |
+| `arm_l1.stl` ~ `arm_l5.stl` | 臂节（随 J1~J5 转） | 12.6k / 8.4k / 2.0k / 2.0k / 11.9k |
+| `arm_drum.stl` | 六边形鼓（随 J6 转） | 72,010 |
+| `col_carriage.stl` | 方形 MARK 板/翻板（滑槽 + P 翻转） | 2,009 |
+| `col_pin.stl` | 装配柱销轴（Q 自旋） | 3,874 |
 | `col_meta.npy` | 销轴几何常量（E 点、轴线） | — |
-| `energy_unit_m.stl` | 能量单元（Ø95×150 线轴） | 36,304 面 |
-| `tech_core_m.stl` | 原始整体网格（米制，拆分母本） | 129,786 面 |
-| `tech_core.stp` / `energy_unit_asm.stp` | 从 653MB 装配体抽出的 STEP 子图 | 源数据 |
-| `preview.png` / `asm_s*.png` | 渲染样例 / 验证截图 | — |
+| `energy_unit_m.stl` | 能量单元（Ø95×150 线轴） | 36,304 |
+| `tech_core_m.stl` | 原始整体网格（米制，拆分母本） | 129,786 |
 
-> 所有拆分 STL 已烘焙竖直变换，**mesh 坐标 = world 坐标（q=0）**，q=0 即 CAD 原始位形。
+> 所有拆分 STL 已烘焙竖直变换，mesh 坐标 = world 坐标（q=0），q=0 即 CAD 原始位形。
 
----
-
-## 5. 关节一览（tech_core_joints.xml，共 9 个）
+## 5. 关节一览（models/tech_core_joints.xml，共 9 个）
 
 | 关节 | 类型 | 轴 / 位置（world） | 范围 | 作用 |
 |---|---|---|---|---|
 | `j1` | 铰 | (0,0,1) @ (0.361, 0.425) | ±170° | 底座回转 |
-| `j2` | 铰 | (−0.343, 0.939, 0) @ (0.487, 0.146, 0.614) | ±120° | 肩俯仰 |
+| `j2` | 铰 | (-0.343, 0.939, 0) @ (0.487, 0.146, 0.614) | ±120° | 肩俯仰 |
 | `j3` | 铰 | 同 j2 轴向 @ (0.339, 0.112, 1.242) | ±150° | 肘俯仰 |
 | `j4` | 铰 | (0.74, 0.269, 0.617) @ (0.040, 0.224, 1.053) | ±180° | 腕回转（沿前臂） |
-| `j5` | 铰 | (−0.343, 0.939, 0) @ (−0.133, −0.094, 0.974) | ±120° | 腕俯仰 |
-| `j6` | 铰 | (0,−1,0) @ 鼓安装座 | ±180° | 法兰回转（鼓法向） |
+| `j5` | 铰 | (-0.343, 0.939, 0) @ (-0.133, -0.094, 0.974) | ±120° | 腕俯仰 |
+| `j6` | 铰 | (0,-1,0) @ 鼓安装座 | ±180° | 法兰回转（鼓法向） |
 | `j_slide` | 滑 | (0,0,1) | 0~100mm | 装配柱滑槽（步骤3） |
-| `j_p` | 铰 | (−1,0,0) @ (−0.1293,−0.22,0.876) | 0~90° | 翻板 P 轴（步骤4，铰在方板内缘上沿） |
-| `j_q` | 铰 | (0,−1,0) @ 销根 | ±90° | Q 自旋（步骤5，弹簧 0.191 N·m/rad ≈ 90°时 0.3N·m） |
+| `j_p` | 铰 | (-1,0,0) @ (-0.1293,-0.22,0.876) | 0~90° | 翻板 P 轴（步骤4，铰在方板内缘上沿） |
+| `j_q` | 铰 | (0,-1,0) @ 销根 | ±90° | Q 自旋（步骤5，弹簧 0.191 N·m/rad ≈ 90° 时 0.3N·m） |
 
 | 几何常量 | 值 |
 |---|---|
-| E（销尖前表面中心，q=0） | (−0.1293, −0.333, 0.7932) m |
-| 销轴 | Ø36×116mm，沿 −Y 指向机器人；插入 100mm 抵腔内铁片 |
-| 能量单元 | Ø95×150mm 线轴；**正面**=−Y 端（Ø40 开口），**背面**=+Y 端（Ø95 平顶盖）；腔深 100mm 处铁片 |
+| E（销尖前表面中心，q=0） | (-0.1293, -0.333, 0.7932) m |
+| 销轴 | Ø36×116mm，沿 -Y 指向机器人；插入 100mm 抵腔内铁片 |
+| 能量单元 | Ø95×150mm 线轴；正面 = -Y 端（Ø40 开口），背面 = +Y 端（Ø95 平顶盖）；腔深 100mm 处铁片 |
 | 方板（MARK 板） | 与销轴一体，P/Q 旋转整体动 |
-
----
 
 ## 6. 坐标系
 
 | 变换 | 公式 |
 |---|---|
-| 规则 OXYZ → world | `(x,y,z) → (y, −x, z)`；world→rule 反之 `(−wy, wx, wz)` |
-| e⃗（销轴外法向） | `(sinφ·sinθ, −sinφ·cosθ, cosφ)`（rule 球坐标） |
-| 初始位姿 | x=−200, y=200, z=800 mm, θ=0°, φ=90°, α=0° |
+| 规则 OXYZ → world | (x,y,z) → (y, -x, z)；反向 (-wy, wx, wz) |
+| e（销轴外法向） | (sinφ·sinθ, -sinφ·cosθ, cosφ)（rule 球坐标） |
+| 初始位姿 | x=-200, y=200, z=800 mm, θ=0°, φ=90°, α=0° |
 | 位姿读数 | 由正运动学从销轴尖端站点实时解出（HUD 显示） |
-| 插入方向 | −e⃗（朝鼓面）；上移 +z（rule 的 +z = world +z） |
-
----
+| 插入方向 | -e（朝鼓面）；上移 +z |
 
 ## 7. 环境
 
 | 项 | 值 |
 |---|---|
-| 运行环境 | `setup.bat` 一键创建的 `.venv`（Python 3.9+，mujoco 3.2.3、glfw、PyOpenGL、numpy、Pillow） |
-| STEP→STL（可选） | 单独的 Python 3.12 + cadquery 2.8.0 + cadquery-ocp 7.9.3 |
-| 显卡注意 | AMD 老驱动：必须用本项目自写 GLFW 查看器（兼容配置），勿用 `python -m mujoco.viewer`（黑屏） |
-| 规则手册 | 官方 PDF（5.4.3 节为核心；`render_figs.py` 可渲染图页，路径在脚本内配置） |
-| 官方装配演示视频 | 抽帧示例在 `vid_frames/`（仓库不含，版权原因） |
+| 运行环境 | setup.bat 创建的 .venv（Python 3.9+；mujoco 3.2.3、glfw、PyOpenGL、numpy、Pillow） |
+| STEP→STL（可选） | 单独 Python 3.12 + cadquery 2.8.0 + cadquery-ocp 7.9.3 |
+| 显卡注意 | AMD 老驱动：必须用本项目 GLFW 查看器（兼容配置），勿用 `python -m mujoco.viewer`（黑屏） |
+| 规则手册 | 官方 PDF（5.4.3 节为核心；tools/render_figs.py 可渲染图页） |
 
-> 本仓库开发机的历史环境：MuJoCo 曾装在 `D:\Download\python.exe`（Python 3.8）——与 .venv 方式等价，可忽略。
+## 8. 数据管线（可复跑，在仓库根目录运行）
 
----
-
-## 8. 数据管线（可复跑）
-
-| 步骤 | 脚本 | 输入 → 输出 |
+| 步骤 | 命令 | 输入 → 输出 |
 |---|---|---|
-| ① 抽 STEP 子图 | `extract_part.py` | 653MB 装配体 → tech_core.stp / energy_unit_asm.stp |
-| ② STEP→STL | `step_to_stl_ocp.py`（Py3.12） | .stp → .stl |
-| ③ 缩放居中 | `prepare_meshes.py` | → *_m.stl（米制） |
-| ④ 拆装配柱 | `split_column.py` | tech_core_m.stl → col_carriage/col_pin.stl + col_meta.npy |
-| ⑤ 拆六轴臂 | `split_arm.py` | tech_core_m.stl → arm_base/arm_l1..l5/arm_drum.stl |
-| ⑥ 验证 | `verify_steps.py` | 全链检查 + 截图 |
+| ① 抽 STEP 子图 | `python tools/extract_part.py` | 官方 653MB 装配体 → tech_core.stp / energy_unit_asm.stp |
+| ② STEP→STL | `python tools/step_to_stl_ocp.py`（Py3.12） | .stp → .stl |
+| ③ 缩放居中 | `python tools/prepare_meshes.py` | → *_m.stl（米制） |
+| ④ 拆装配柱 | `python tools/split_column.py` | tech_core_m.stl → col_carriage/col_pin.stl |
+| ⑤ 拆六轴臂 | `python tools/split_arm.py` | tech_core_m.stl → arm_base/arm_l1..l5/arm_drum.stl |
+| ⑥ 验证 | `python src/verify_steps.py` | 全链检查 + output/ 截图 |
 
----
-
-## 9. 辅助脚本速查（历史调试产物，可删）
+## 9. tools/ 速查
 
 | 脚本 | 作用 |
 |---|---|
-| `stl_components.py` | STL 连通域分析（拆件的基础工具） |
-| `comp_ident.py` / `col_ident.py` | 分件着色渲染（辨认部件用） |
-| `render_figs.py` | 规则手册页面渲染成 PNG（读图用，图页码见 HANDOFF 七-12） |
-| `xform_check.py` | 验证 MuJoCo 网格坐标变换（坑 #7） |
-| `multi_view.py` / `cal_cam.py` | 多角度渲染 / 相机标定 |
-| `verify_joints.py` | 旧位姿链映射检查（已过时） |
-| `verify_model.py` / `view_model.py` / `tech_core_energy_unit.xml` | v1 整体模型三件套（保留） |
-| 其余 glcheck/hud_/cam_test 等 | 早期 GL/HUD 调试，均可删 |
-
----
+| `split_arm.py` / `split_column.py` | 网格拆分（核心管线） |
+| `stl_components.py` | STL 连通域分析（拆件基础工具） |
+| `comp_ident.py` | 分件着色渲染（辨认部件） |
+| `render_figs.py` | 规则手册页面渲染成 PNG |
+| `xform_check.py` | 验证 MuJoCo 网格坐标变换 |
+| `parse_asm2.py` | STEP 中文实例名解码 |
+| `pdf_search.py` / `pdf_extract.py` | 规则手册检索/抽取（路径在脚本内配置） |
 
 ## 10. 已知限制
 
 | 项 | 状态 |
 |---|---|
 | L4 双核同步 | 未实现，按 L3 演示 |
-| 动力学力矩 | 运动学摆位 + HUD 数值显示；弹簧参数已写入 XML 但未做真动力学 |
+| 动力学力矩 | 运动学摆位 + HUD 数值；弹簧参数已写入 XML 未做真动力学 |
 | 关节限位 | 估值（无官方数据） |
-| 臂小件分组 | ~180 小件按就近分配，可能错挂（`split_arm.py` KEY_GROUPS 可调） |
+| 臂小件分组 | 约 180 小件按就近分配可能错挂（split_arm.py KEY_GROUPS 可调） |
 | 位姿→关节角反解 | 无 IK，只有正运动学读数 |
 | 能量单元内槽 | 按对准公差 + 移动深度近似（真实 L 形槽无剖面图） |
-| 工程机器人 | 未建模（可行性见对话结论：运动学级约 1 天） |
+| 工程机器人 | 未建模 |

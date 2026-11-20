@@ -1,5 +1,5 @@
 <mujoco model="tech_core_energy_unit">
-  <compiler angle="degree" meshdir="assets"/>
+  <compiler angle="degree" meshdir="../assets"/>
 
   <option gravity="0 0 -9.81"/>
 

@@ -1,5 +1,5 @@
 # 一键安装（PowerShell 版，功能同 setup.bat）
-# 用法: 右键"使用 PowerShell 运行"，或执行  powershell -ExecutionPolicy Bypass -File setup.ps1
+# 用法: powershell -ExecutionPolicy Bypass -File setup.ps1
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
@@ -15,12 +15,12 @@ if (-not (Test-Path .venv)) {
 }
 
 Write-Host "[2/3] 安装依赖 ..."
-& .\.venv\Scripts\python.exe -m pip install --upgrade pip -q
-& .\.venv\Scripts\python.exe -m pip install -r requirements.txt -q
+& "./.venv/Scripts/python.exe" -m pip install --upgrade pip -q
+& "./.venv/Scripts/python.exe" -m pip install -r requirements.txt -q
 
 Write-Host "[3/3] 自检（无头验证）..."
-& .\.venv\Scripts\python.exe verify_steps.py
+& "./.venv/Scripts/python.exe" src/verify_steps.py
 
 Write-Host ""
 Write-Host "================= 安装完成 ================="
-Write-Host "运行仿真:  run.bat   （或 .venv\Scripts\python.exe assemble_view.py）"
+Write-Host "运行仿真:  run.bat   （或 .venv/Scripts/python.exe src/assemble_view.py）"

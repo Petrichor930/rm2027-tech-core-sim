@@ -5,12 +5,15 @@ try:
     sys.stdout.reconfigure(encoding='utf-8')
 except Exception:
     pass
-import math
+import math, os
 import mujoco
 import numpy as np
 from PIL import Image
 
-model = mujoco.MjModel.from_xml_path("tech_core_joints.xml")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUTPUT_DIR = os.path.join(ROOT, "output")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+model = mujoco.MjModel.from_xml_path(os.path.join(ROOT, "models", "tech_core_joints.xml"))
 data = mujoco.MjData(model)
 J = {mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, i): model.jnt_qposadr[i] for i in range(model.njnt)}
 SID = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "pin_tip")
@@ -43,7 +46,7 @@ def cam_look(pos, target):
 def shot(name, tgt=(0,0,0.9), off=(0.4,-1.6,0.5)):
     mujoco.mj_forward(model, data)
     r.update_scene(data, camera=cam_look(np.array(tgt)+np.array(off), tgt))
-    Image.fromarray(r.render()).save(name)
+    Image.fromarray(r.render()).save(os.path.join(OUTPUT_DIR, name))
     print("saved", name)
 
 # ===== 1. 零位：E 精确在 CAD 位置 =====

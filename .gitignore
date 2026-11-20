@@ -56,3 +56,4 @@ render_test.py
 stl_info.py
 step_to_stl.py
 verify_joints.py
+output/

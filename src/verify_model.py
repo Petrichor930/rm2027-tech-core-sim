@@ -1,4 +1,4 @@
-import sys
+import sys, os
 try:
     sys.stdout.reconfigure(encoding='utf-8')
 except Exception:
@@ -7,7 +7,10 @@ import mujoco
 import numpy as np
 from PIL import Image
 
-model = mujoco.MjModel.from_xml_path("tech_core_energy_unit.xml")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUTPUT_DIR = os.path.join(ROOT, "output")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+model = mujoco.MjModel.from_xml_path(os.path.join(ROOT, "models", "tech_core_energy_unit.xml"))
 data = mujoco.MjData(model)
 print("loaded OK")
 print("  nbody:", model.nbody, " ngeom:", model.ngeom, " nq:", model.nq, " nv:", model.nv)
@@ -23,8 +26,8 @@ print("  energy_unit pos after 200 steps:", data.qpos[model.jnt_qposadr[model.bo
 renderer = mujoco.Renderer(model, height=480, width=640)
 renderer.update_scene(data, camera="cam")
 pixels = renderer.render()
-Image.fromarray(pixels).save("assets/preview.png")
+Image.fromarray(pixels).save(os.path.join(OUTPUT_DIR, "preview.png"))
 arr = pixels.astype(np.float32)
 lum = 0.299*arr[:,:,0]+0.587*arr[:,:,1]+0.114*arr[:,:,2]
 print("  render mean brightness:", round(float(lum.mean()), 1), " max:", float(lum.max()))
-print("  preview saved assets/preview.png")
+print("  preview saved output/preview.png")

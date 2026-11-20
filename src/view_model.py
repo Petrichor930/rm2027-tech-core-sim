@@ -10,7 +10,10 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import mujoco
 
-MODEL_PATH = "tech_core_energy_unit.xml"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL_PATH = os.path.join(ROOT, "models", "tech_core_energy_unit.xml")
+OUTPUT_DIR = os.path.join(ROOT, "output")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 model = mujoco.MjModel.from_xml_path(MODEL_PATH)
 data = mujoco.MjData(model)
@@ -237,7 +240,7 @@ while not glfw.window_should_close(window):
         rgb = np.empty((fbh, fbw, 3), dtype=np.uint8)
         mujoco.mjr_readPixels(rgb, None, mujoco.MjrRect(0, 0, fbw, fbh), ctx)
         shot[0] += 1
-        Image.fromarray(rgb[::-1]).save(f"shot_{shot[0]:03d}.png")
+        Image.fromarray(rgb[::-1]).save(os.path.join(OUTPUT_DIR, f"shot_{shot[0]:03d}.png"))
         print(f"已保存 shot_{shot[0]:03d}.png")
     pending.clear()
 
