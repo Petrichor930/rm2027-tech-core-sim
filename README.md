@@ -13,11 +13,14 @@ rm2027-tech-core-sim/
 ├── setup.bat/.ps1       一键安装（建 .venv + 装依赖 + 自检）
 ├── run.bat              一键运行仿真
 ├── models/              MJCF 模型
-│   ├── tech_core_joints.xml        主模型（六轴臂 + 装配柱 + 能量单元）
+│   ├── tech_core_joints.xml        主模型（科技核心臂 + 工程臂 + 装配柱 + 能量单元）
+│   └── robot_arm.xml               工程六轴臂+夹爪（gen_robot_xml.py 生成）
 │   └── tech_core_energy_unit.xml   v1 整体模型（保留）
 ├── src/                 运行程序
 │   ├── assemble_view.py     ★交互仿真主程序
+│   ├── robot_ik.py          工程臂阻尼最小二乘 IK + 抓取判定
 │   ├── verify_steps.py      无头验证（安装自检用）
+│   ├── verify_robot.py      工程臂无头验证（抓取+装配跟随）
 │   ├── view_model.py        v1 查看器
 │   └── verify_model.py      v1 验证
 ├── tools/               数据管线与分析（在仓库根目录运行）
@@ -51,7 +54,9 @@ rm2027-tech-core-sim/
 | `[` `]` | 调步骤 5 目标角度 | 默认 +30° |
 | `X` | 取出能量单元（装配失败） | 规则允许 ≤10N 拔出 |
 | `Enter` | 步骤 6 确认装配 | 成功显示 ★SUCCESS |
-| `←→` `↑↓` `R` | 机械臂模式：选关节 / ±1° / 全部归零 | J1~J6 循环选择 |
+| `←→` `↑↓` `R` | 臂模式（科技核心/工程臂）：选关节 / ±1° / 全部归零 | J1~J6 或 r1~r6 循环选择 |
+| `C` / `O` | 夹爪 闭合 / 张开 | 闭合时能量单元入抓取域即锁定；张开释放 |
+| `Tab` 第3档 | 工程臂模式 | 点动 r1~r6；抓持时拖动能量单元 = IK 目标 |
 | `T` | 数字输入六关节角 | 输入 J1 J2 J3 J4 J5 J6（度），如 `0 30 -20 0 0 0` |
 | `M` / `N` | 测量工具开/关 / 清测点 | 点两表面点，出斜边 |AB| + 直角边 Δx/Δy/Δz（rule 笛卡尔系） |
 | 鼠标左/右/中 | 能量单元平移/旋转/升降 | 未锁定时可用；测量模式下左键=取点 |
@@ -118,6 +123,9 @@ HUD 每帧显示：下一步提示（▶ 行）、位姿读数 (x,y,z,θ,φ,α)�
 | `j_p` | 铰 | (-1,0,0) @ (-0.1293,-0.22,0.876) | 0~90° | 翻板 P 轴（步骤4，铰在方板内缘上沿） |
 | `j_q` | 铰 | (0,-1,0) @ 销根 | ±90° | Q 自旋（步骤5，弹簧 0.191 N·m/rad ≈ 90° 时 0.3N·m） |
 
+| `j_r1`~`j_r6` | 铰 | 工程臂六轴（STEP 拟合）：r1 垂直@底座、r2 肩(1,0,0)@z0.088、r3 肘@ (0,0.259,0.292)、r4 腕转(0,1,0)@ (0,0.415,0.352)、r5 腕俯仰@ (−0.031,0.484,0.35)、r6 法兰(0,1,0)@ (0,0.615,0.346) | r1/r4/r6 ±180°，r2/r5 ±120°，r3 ±150° | 搬运能量单元 |
+| `j_rfa`/`j_rfb` | 滑 | 夹爪两指（±行程 45mm），指距 26~116mm | 0~115mm | 抓取能量单元 |
+
 | 几何常量 | 值 |
 |---|---|
 | E（销尖前表面中心，q=0） | (-0.1293, -0.333, 0.7932) m |
@@ -154,6 +162,9 @@ HUD 每帧显示：下一步提示（▶ 行）、位姿读数 (x,y,z,θ,φ,α)�
 | ④ 拆装配柱 | `python tools/split_column.py` | tech_core_m.stl → col_carriage/col_pin.stl |
 | ⑤ 拆六轴臂 | `python tools/split_arm.py` | tech_core_m.stl → arm_base/arm_l1..l5/arm_drum.stl |
 | ⑥ 验证 | `python src/verify_steps.py` | 全链检查 + output/ 截图 |
+| ⑦ 工程臂拆分 | `python tools/robot_step_export.py` + `tools/split_robot.py` | 机械臂主体.STEP → robot_*.stl + robot_meta.npy |
+| ⑧ 生成臂 MJCF | `python tools/gen_robot_xml.py` | robot_meta.npy → models/robot_arm.xml |
+| ⑨ 工程臂验证 | `python src/verify_robot.py` | 抓取/装配跟随检查 + 截图 |
 
 ## 9. tools/ 速查
 
@@ -177,4 +188,6 @@ HUD 每帧显示：下一步提示（▶ 行）、位姿读数 (x,y,z,θ,φ,α)�
 | 臂小件分组 | 约 180 小件按就近分配可能错挂（split_arm.py KEY_GROUPS 可调） |
 | 位姿→关节角反解 | 无 IK，只有正运动学读数 |
 | 能量单元内槽 | 按对准公差 + 移动深度近似（真实 L 形槽无剖面图） |
-| 工程机器人 | 未建模 |
+| 工程臂 | ★已建模（六轴+丝杆夹爪，STEP 拆分）；步骤4-5 影随在臂展极限外尽力而为
+| 工程臂关节限位/夹爪行程 | 估值（STEP 无运动参数）；平行连杆按随动近似
+| 工程臂 IK | 纯位置+姿态阻尼最小二乘，无避障 |
