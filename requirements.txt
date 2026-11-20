@@ -1,0 +1,12 @@
+# 运行依赖（Python 3.9~3.12 均可；MuJoCo 自带二进制，无需系统库）
+mujoco==3.2.3
+glfw>=2.5
+PyOpenGL>=3.1
+numpy>=1.21
+Pillow>=9.0
+
+# 可选（仅分析/管线脚本用，非运行必需）：
+# matplotlib        # comp_ident.py / comp_views.py 分件着色渲染
+# opencv-python     # 视频抽帧
+# PyMuPDF           # render_figs.py 规则手册渲染
+# cadquery==2.8.0   # STEP→STL 管线（建议单独装 Python 3.12）

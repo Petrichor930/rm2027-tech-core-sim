@@ -1,0 +1,33 @@
+<mujoco model="tech_core_energy_unit">
+  <compiler angle="degree" meshdir="assets"/>
+
+  <option gravity="0 0 -9.81"/>
+
+  <asset>
+    <mesh name="tech_core" file="tech_core_m.stl"/>
+    <mesh name="energy_unit" file="energy_unit_m.stl"/>
+    <texture name="grid" type="2d" builtin="checker" rgb1="0.75 0.75 0.75" rgb2="0.5 0.5 0.5"
+             width="300" height="300"/>
+    <material name="grid" texture="grid" texrepeat="6 6" reflectance="0.1"/>
+  </asset>
+
+  <worldbody>
+    <light name="key" pos="0 -3 4" dir="0 0 -1" diffuse="0.9 0.9 0.9" specular="0.2 0.2 0.2"/>
+    <light name="fill" pos="2 2 3" diffuse="0.4 0.4 0.4"/>
+    <light name="amb" pos="0 0 5" diffuse="0.3 0.3 0.3"/>
+    <camera name="cam" pos="0 -2.5 1.8" xyaxes="1 0 0 0 0.55 0.85"/>
+    <geom name="floor" type="plane" size="4 4 0.1" material="grid"/>
+
+    <!-- 科技核心（整体可动，底座固定） -->
+    <body name="tech_core" mocap="true" pos="0 0 0.851" quat="0.70710678 -0.70710678 0 0">
+      <geom name="tech_core_vis" type="mesh" mesh="tech_core"
+            rgba="0.72 0.74 0.78 1"/>
+    </body>
+
+    <!-- 能量单元（可拖动） -->
+    <body name="energy_unit" mocap="true" pos="0 0 1.6" quat="0.70710678 -0.70710678 0 0">
+      <geom name="energy_unit_vis" type="mesh" mesh="energy_unit"
+            rgba="0.20 0.50 0.90 1"/>
+    </body>
+  </worldbody>
+</mujoco>

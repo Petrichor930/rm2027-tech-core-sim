@@ -1,0 +1,58 @@
+__pycache__/
+*.pyc
+.venv/
+
+# 调试渲染 / 截图（verify_steps.py 会重新生成）
+*.png
+*.log
+
+# 临时分析产物
+vid_frames/
+comp_meshes/
+col_meshes/
+col.xml
+col2.xml
+comps.xml
+demo.xml
+shot*.ps1
+
+# 大体积原始数据（自行按 README 数据管线从官方 STEP 提取）
+tech_core.stl
+energy_unit.stl
+energy_unit_asm.stl
+*.stp
+
+# 内部交接文档（不上传）
+HANDOFF.md
+
+# 规则手册抽取内容（版权归大疆，勿上传）
+tech_core_extract.txt
+figs_page_*.png
+fig57_*.png
+
+# 本机历史调试脚本（不属于交付物）
+analyze_shells.py
+analyze_split.py
+cal_cam.py
+cam_test.py
+col_ident.py
+comp_views.py
+control_test.py
+convert_stl.py
+diag_step.py
+extract_placement.py
+fb_test.py
+find_column.py
+find_missing.py
+glcheck*.py
+hud_*.py
+joint_test.py
+multi_view.py
+my_viewer.py
+onscreen_test.py
+parse_asm.py
+pivot_test.py
+render_test.py
+stl_info.py
+step_to_stl.py
+verify_joints.py
