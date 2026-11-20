@@ -28,6 +28,7 @@ from OpenGL import GL
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import mujoco
+from robot_ik import IKSolver, grasp_check
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_PATH = os.path.join(ROOT, "models", "tech_core_joints.xml")
@@ -42,6 +43,9 @@ J = {}
 for i in range(model.njnt):
     J[mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, i)] = model.jnt_qposadr[i]
 SID_PIN = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "pin_tip")
+SID_GRASP = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "grasp")
+ik = IKSolver(model, data)
+IK_ERR = [0.0]
 EU = model.body('energy_unit')
 EU_MOCAP = int(EU.mocapid)
 
@@ -64,6 +68,32 @@ ARM_NAME = ['J1底座回转', 'J2肩俯仰', 'J3肘俯仰', 'J4腕回转', 'J5�
 def zero_arm():
     for j in ARM_J:
         data.qpos[J[j]] = 0.0
+
+ROBOT_J = ['j_r1', 'j_r2', 'j_r3', 'j_r4', 'j_r5', 'j_r6']
+ROBOT_NAME = ['r1底座', 'r2肩', 'r3肘', 'r4腕转', 'r5腕俯仰', 'r6法兰']
+
+def zero_robot():
+    for j in ROBOT_J:
+        data.qpos[J[j]] = 0.0
+
+def finger_gap():
+    """指距 = gap0 - (q_a + q_b)（q+ 向内=闭合）"""
+    return 0.0257 - (data.qpos[J['j_rfa']] + data.qpos[J['j_rfb']])
+
+def drive_fingers(closing, opening):
+    """C 闭合 / O 张开；限位保证指距 5mm..115mm"""
+    qa, qb = data.qpos[J['j_rfa']], data.qpos[J['j_rfb']]
+    d = 0.0015
+    if closing:
+        if finger_gap() > 0.005:
+            qa += d; qb += d
+    if opening:
+        if finger_gap() < 0.115:
+            qa -= d; qb -= d
+    lo, hi = model.jnt_range[J['j_rfa']]
+    data.qpos[J['j_rfa']] = min(hi, max(lo, qa))
+    lo, hi = model.jnt_range[J['j_rfb']]
+    data.qpos[J['j_rfb']] = min(hi, max(lo, qb))
 
 def arm_pose_readout():
     """从运动学正解读出规则位姿 (x,y,z,θ,φ,α)（mm/°）"""
@@ -154,14 +184,19 @@ class State:
         self.insert = 0.0            # 步骤2 插入深度 (m)
         self.lift = 0.0              # 步骤3 上移量 (m)
         self.q_target = 30.0         # 步骤5 指定角度 (deg)
-        self.latched = False         # 能量单元已锁定到销轴
-        self.T_rel = None            # 锁定时 unit 相对 pin 的变换 (pos, R)
+        self.latched = False         # 能量单元已锁定（pin 或 gripper）
+        self.attach = ""             # "" / "pin" / "gripper"
+        self.T_rel = None            # 锁定时 unit 相对站点的变换 (pos, R)
+        self.T_grasp = None          # 最近一次夹爪抓持变换（释放后供手臂影随）
         self.align_ref = None        # 对准起点 (unit pos, R)
         self.hold = False            # 步骤5 保持 (0.5N·m)
         self.dwell = 0.0             # 步骤5 目标角度停留时间
         self.result = ""             # SUCCESS / FAIL
         self.q_hold_angle = 0.0
         zero_arm()
+        zero_robot()
+        data.qpos[J['j_rfa']] = -0.045
+        data.qpos[J['j_rfb']] = -0.045   # 初始张开
         e0 = np.array([0.0, -1.0, 0.0])   # 零位销轴方向
         data.mocap_pos[EU_MOCAP] = E_LOCAL + e0*0.35
         data.mocap_quat[EU_MOCAP] = np.array([0.70710678, 0.70710678, 0, 0])  # 顶盖朝上、开口朝下
@@ -208,8 +243,8 @@ HUD_FONT = ImageFont.truetype("C:/Windows/Fonts/msyh.ttc", 22)
 
 last_x, last_y = [0.0], [0.0]
 btn_left, btn_right, btn_middle = [False], [False], [False]
-MODES = ["unit", "arm", "camera"]
-MODE_NAME = {"unit": "能量单元", "arm": "机械臂六轴", "camera": "相机"}
+MODES = ["unit", "arm", "robot", "camera"]
+MODE_NAME = {"unit": "能量单元", "arm": "科技核心臂", "robot": "工程臂", "camera": "相机"}
 mode = [0]
 show_hud = [True]
 pending = set()
@@ -218,7 +253,9 @@ t0 = [time.time()]; frames = [0]; fps = [0.0]; shot = [0]
 
 MEASURE = {"on": False, "A": None, "B": None}   # 测量工具（M 开关，N 清空）
 pose_buf = [None]                               # 数字输入六关节角缓冲（T 开启）
-ARM_SEL = [0]                                   # 机械臂模式当前选中关节 0..5
+robot_buf = [None]                              # 工程臂六关节角输入缓冲
+ARM_SEL = [0]                                   # 科技核心臂模式当前选中关节 0..5
+ROBOT_SEL = [0]                                 # 工程臂模式当前选中关节 0..5
 
 MOVE = 0.004      # 每帧平移
 ROT = 1.2         # 每帧旋转°
@@ -233,9 +270,10 @@ def key_cb(w, key, sc, action, mods):
 
 def char_cb(w, codepoint):
     ch = chr(codepoint)
-    if pose_buf[0] is not None and (ch.isdigit() or ch in " -.+"):
-        if len(pose_buf[0]) < 64:
-            pose_buf[0] += ch
+    for buf in (pose_buf, robot_buf):
+        if buf[0] is not None and (ch.isdigit() or ch in " -.+"):
+            if len(buf[0]) < 64:
+                buf[0] += ch
 
 def mouse_button_cb(w, button, action, mods):
     if button == glfw.MOUSE_BUTTON_LEFT:
@@ -272,7 +310,7 @@ def cursor_pos_cb(w, x, y):
         elif btn_middle[0]:
             cam.distance = max(0.05, min(50.0, cam.distance*math.exp(dy*0.01)))
     elif m == 'unit':
-        if S.latched:
+        if S.latched and S.attach == "pin":
             pass  # 锁定到销轴后跟随机构，不能拖
         else:
             s = cam.distance * 0.003
@@ -294,7 +332,7 @@ def scroll_cb(w, xo, yo):
     m = MODES[mode[0]]
     if m == 'camera':
         cam.distance = max(0.05, min(50.0, cam.distance*math.exp(-yo*0.1)))
-    elif m == 'unit' and not (S.assembly and S.latched):
+    elif m == 'unit' and not (S.latched and S.attach == "pin"):
         data.mocap_pos[EU_MOCAP][2] += yo * cam.distance * 0.002
 
 glfw.set_key_callback(window, key_cb)
@@ -385,18 +423,34 @@ def auto_align():
     S.align_ref = (data.mocap_pos[EU_MOCAP].copy(), R.copy())
     S.insert = 0.0
 
-def latch_unit():
-    ppos, pquat, pR = pin_frame()
+def src_frame(src):
+    """锁定源站点的世界位姿 (pos, R)：pin -> pin_tip；gripper -> grasp"""
+    sid = SID_PIN if src == "pin" else SID_GRASP
+    return data.site_xpos[sid].copy(), data.site_xmat[sid].reshape(3, 3).copy()
+
+def attach_unit(src):
+    """锁定能量单元到 pin 或 gripper（互斥）；gripper 时记住 T_grasp 供影随"""
+    ppos, pR = src_frame(src)
     uR = quat_to_mat(data.mocap_quat[EU_MOCAP])
-    Rp = pR.T
-    S.T_rel = (Rp @ (data.mocap_pos[EU_MOCAP] - ppos), Rp @ uR)
+    S.T_rel = (pR.T @ (data.mocap_pos[EU_MOCAP] - ppos), pR.T @ uR)
     S.latched = True
+    S.attach = src
+    if src == "gripper":
+        S.T_grasp = (S.T_rel[0].copy(), S.T_rel[1].copy())
 
 def apply_latched():
-    ppos, pquat, pR = pin_frame()
+    ppos, pR = src_frame(S.attach)
     tp, tR = S.T_rel
     data.mocap_pos[EU_MOCAP] = ppos + pR @ tp
     data.mocap_quat[EU_MOCAP] = mat_to_quat(pR @ tR)
+
+def hand_target_from_unit():
+    """由单元位姿反推 grasp 站点目标位姿 (pos, R)（IK 用）"""
+    tp, tR = S.T_rel
+    uR = quat_to_mat(data.mocap_quat[EU_MOCAP])
+    Rt = uR @ tR.T
+    pt = data.mocap_pos[EU_MOCAP] - Rt @ tp
+    return pt, Rt
 
 def reset_assembly(keep_pose=True):
     arm_q = [data.qpos[J[j]] for j in ARM_J]
@@ -405,9 +459,9 @@ def reset_assembly(keep_pose=True):
         for j in ARM_J:
             data.qpos[J[j]] = arm_q[ARM_J.index(j)]
 
-HELP = ("Tab=切换(能量单元/机械臂/相机)  1/2/3/4=难度  F=开始装配  G=自动对准\n"
+HELP = ("Tab=切换(能量单元/科技核心臂/工程臂/相机)  1/2/3/4=难度  F=开始装配  G=自动对准\n"
         "装配: W/S=插入·上移  A/D=绕P·绕Q  [ ]=指定角度  X=取出  Enter=确认\n"
-        "机械臂模式: ←→=选关节 J1..J6  ↑↓=±1°  R=全部归零  T=输入六关节角\n"
+        "科技核心臂: ←→选关节 ↑↓=±1° R=归零 T=输入角   工程臂: 同左（C=夹爪闭合 O=张开）\n"
         "测量: M=开/关 点击两点出|AB|斜边+Δx/Δy/Δz直角边  N=清测点\n"
         "相机: 左键=旋转 右键=平移 滚轮=缩放   Backspace=重置  P=截图  H=HUD  Esc=退出")
 
@@ -432,36 +486,41 @@ last_result = [""]
 while not glfw.window_should_close(window):
     dt = 1.0/60.0
 
-    # ---- 数字输入六关节角 J1..J6 (°)，Enter 确认，Esc 取消 ----
-    if pose_buf[0] is not None:
-        if glfw.KEY_BACKSPACE in pending:
-            pose_buf[0] = pose_buf[0][:-1]
-        if glfw.KEY_ESCAPE in pending:
-            pose_buf[0] = None
-            print("[arm] 已取消输入")
-        if glfw.KEY_ENTER in pending:
-            parts = pose_buf[0].split()
-            if len(parts) == 6:
-                try:
-                    v = [float(p) for p in parts]
-                    for j, a in zip(ARM_J, v):
-                        lo, hi = model.jnt_range[J[j]]
-                        data.qpos[J[j]] = np.radians(max(np.degrees(lo), min(np.degrees(hi), a)))
-                    print(f"[arm] 关节角设定: J1={v[0]} J2={v[1]} J3={v[2]} J4={v[3]} J5={v[4]} J6={v[5]}")
-                except ValueError:
-                    print("[arm] 数字解析失败，格式: J1 J2 J3 J4 J5 J6 (°)，如 0 30 -20 0 0 0")
-            else:
-                print("[arm] 需要 6 个数字: J1 J2 J3 J4 J5 J6 (°)")
-            pose_buf[0] = None
-        pending.clear()
+    # ---- 数字输入六关节角 (°)，Enter 确认，Esc 取消（科技核心臂 / 工程臂 双缓冲）----
+    for buf, jlist, tag in ((pose_buf, ARM_J, "arm"), (robot_buf, ROBOT_J, "robot")):
+        if buf[0] is not None:
+            if glfw.KEY_BACKSPACE in pending:
+                buf[0] = buf[0][:-1]
+            if glfw.KEY_ESCAPE in pending:
+                buf[0] = None
+                print(f"[{tag}] 已取消输入")
+            if glfw.KEY_ENTER in pending:
+                parts = buf[0].split()
+                if len(parts) == 6:
+                    try:
+                        v = [float(p) for p in parts]
+                        for j, a in zip(jlist, v):
+                            lo, hi = model.jnt_range[J[j]]
+                            data.qpos[J[j]] = np.radians(max(np.degrees(lo), min(np.degrees(hi), a)))
+                        print(f"[{tag}] 关节角设定: {v}")
+                    except ValueError:
+                        print(f"[{tag}] 数字解析失败，格式: 6 个角度（度）")
+                else:
+                    print(f"[{tag}] 需要 6 个数字（度）")
+                buf[0] = None
+            pending.clear()
 
     if glfw.KEY_ESCAPE in pending: break
-    if glfw.KEY_TAB in pending: mode[0] = (mode[0]+1) % 3
+    if glfw.KEY_TAB in pending: mode[0] = (mode[0]+1) % 4
     if glfw.KEY_H in pending: show_hud[0] = not show_hud[0]
-    if glfw.KEY_T in pending and pose_buf[0] is None:
-        pose_buf[0] = ""
-        mode[0] = 1
-        print("[arm] 输入六关节角 J1 J2 J3 J4 J5 J6 (°)，如 0 30 -20 0 0 0，Enter 确认，Esc 取消")
+    if glfw.KEY_T in pending and pose_buf[0] is None and robot_buf[0] is None:
+        if MODES[mode[0]] == "robot":
+            robot_buf[0] = ""
+            print("[robot] 输入工程臂六关节角 (°)，Enter 确认，Esc 取消")
+        else:
+            pose_buf[0] = ""
+            mode[0] = 1
+            print("[arm] 输入六关节角 J1 J2 J3 J4 J5 J6 (°)，如 0 30 -20 0 0 0，Enter 确认，Esc 取消")
     if glfw.KEY_M in pending:
         MEASURE["on"] = not MEASURE["on"]
         print(f"[测量] {'开：点击物体表面取 A/B 两点' if MEASURE['on'] else '关'}")
@@ -479,7 +538,7 @@ while not glfw.window_should_close(window):
         S.assembly = True
         S.step = 2
         S.result = ""
-        S.insert = 0.0; S.lift = 0.0; S.latched = False; S.T_rel = None
+        S.insert = 0.0; S.lift = 0.0; S.latched = False; S.T_rel = None; S.attach = ""
         S.hold = False; S.dwell = 0.0
         data.qpos[J['j_slide']] = 0.0
         data.qpos[J['j_p']] = 0.0
@@ -513,7 +572,7 @@ while not glfw.window_should_close(window):
     if keys(glfw.KEY_RIGHT_BRACKET): S.q_target = min(90, S.q_target + 1.5)
 
     m = MODES[mode[0]]
-    if m == 'unit' and not S.latched and not (S.assembly and S.step in (2, 3, 4, 5)):
+    if m == 'unit' and not (S.latched and S.attach == "pin") and not (S.assembly and S.step in (2, 3, 4, 5)):
         # 自由模式键盘移动/旋转（与 view_model.py 一致）
         dpos = np.zeros(3); dquat = np.array([1.0, 0, 0, 0])
         if keys(glfw.KEY_W): dpos[0] += MOVE
@@ -536,7 +595,7 @@ while not glfw.window_should_close(window):
                 S.align_ref = None
                 S.insert = 0.0
     if m == 'arm' and not (S.assembly and S.latched):
-        # 机械臂六轴点动：←→选关节，↑↓±1°，R 全部归零
+        # 科技核心臂六轴点动：←→选关节，↑↓±1°，R 全部归零
         if keys(glfw.KEY_LEFT):  ARM_SEL[0] = (ARM_SEL[0] - 1) % 6
         if keys(glfw.KEY_RIGHT): ARM_SEL[0] = (ARM_SEL[0] + 1) % 6
         jn = ARM_J[ARM_SEL[0]]
@@ -547,6 +606,33 @@ while not glfw.window_should_close(window):
             data.qpos[J[jn]] = max(lo, data.qpos[J[jn]] - math.radians(1.0))
         if keys(glfw.KEY_R):
             zero_arm()
+    if m == 'robot':
+        # 工程臂六轴点动：←→选关节，↑↓±1°，R 全部归零
+        if keys(glfw.KEY_LEFT):  ROBOT_SEL[0] = (ROBOT_SEL[0] - 1) % 6
+        if keys(glfw.KEY_RIGHT): ROBOT_SEL[0] = (ROBOT_SEL[0] + 1) % 6
+        jn = ROBOT_J[ROBOT_SEL[0]]
+        lo, hi = model.jnt_range[J[jn]]
+        if keys(glfw.KEY_UP):
+            data.qpos[J[jn]] = min(hi, data.qpos[J[jn]] + math.radians(1.0))
+        if keys(glfw.KEY_DOWN):
+            data.qpos[J[jn]] = max(lo, data.qpos[J[jn]] - math.radians(1.0))
+        if keys(glfw.KEY_R):
+            zero_robot()
+
+    # ---- 夹爪：C 闭合 / O 张开（任意模式）+ 抓取/释放边沿检测 ----
+    drive_fingers(keys(glfw.KEY_C), keys(glfw.KEY_O))
+    if S.attach == "" and keys(glfw.KEY_C):
+        uR = quat_to_mat(data.mocap_quat[EU_MOCAP])
+        ok_g, dist, gap, ang = grasp_check(model, data, finger_gap(),
+                                           data.mocap_pos[EU_MOCAP], SID_GRASP, uR)
+        if ok_g:
+            attach_unit("gripper")
+            print(f"[抓取] 锁定到夹爪 dist={dist*1000:.0f}mm gap={gap*1000:.0f}mm")
+    if S.attach == "gripper" and keys(glfw.KEY_O) and finger_gap() > 0.105:
+        S.latched = False; S.attach = ""; S.T_rel = None
+        print("[释放] 夹爪张开，能量单元释放")
+        if S.assembly and not S.result:
+            S.result = "FAIL(extracted)"
 
     # ---- 装配步骤控制 ----
     if S.assembly and not S.result:
@@ -572,7 +658,8 @@ while not glfw.window_should_close(window):
                         S.insert = float(np.clip(-np.dot(dpos, e), 0, 0.1))
                 if S.insert >= 0.0999:
                     S.insert = 0.1
-                    latch_unit()
+                    attach_unit("pin")
+                    drive_fingers(False, True)   # 张开释放（互斥）
                     S.step = 3 if 3 in S.step_list() else 6
         elif S.step == 3:
             if keys(glfw.KEY_W): S.lift = min(0.1, S.lift + 0.0025)
@@ -608,9 +695,23 @@ while not glfw.window_should_close(window):
                 S.dwell = 0.0
                 S.hold = False
 
-    # latch 后跟随
+    # ---- 主从/IK：抓持期 IK 跟随；释放后手臂影随单元（机器人"完成"装配） ----
     if S.latched and not S.result:
-        apply_latched()
+        if S.attach == "gripper" and MODES[mode[0]] == "robot":
+            apply_latched()                      # 臂主：单元跟随夹爪
+        elif S.attach == "pin":
+            apply_latched()                      # 单元随销轴/机构
+            if S.T_grasp is not None and MODES[mode[0]] != "robot":
+                tp, tR = S.T_grasp
+                uR = quat_to_mat(data.mocap_quat[EU_MOCAP])
+                Rt = uR @ tR.T
+                IK_ERR[0] = ik.solve(data.mocap_pos[EU_MOCAP] - Rt @ tp, Rt, iters=2)
+        else:
+            tp, tR = S.T_grasp if S.T_grasp is not None else S.T_rel
+            uR = quat_to_mat(data.mocap_quat[EU_MOCAP])
+            Rt = uR @ tR.T
+            pt = data.mocap_pos[EU_MOCAP] - Rt @ tp
+            IK_ERR[0] = ik.solve(pt, Rt, iters=3)   # 单元主：IK 跟随
         if S.step == 2:
             S.step = 3 if 3 in S.step_list() else 6
 
@@ -666,6 +767,11 @@ while not glfw.window_should_close(window):
             "关节: " + "  ".join(
                 (">" if i == ARM_SEL[0] else "") + f"{ARM_NAME[i][0:2]}={np.degrees(data.qpos[J[ARM_J[i]]]):+.0f}°"
                 for i in range(6)),
+            "工程臂: " + "  ".join(
+                (">" if i == ROBOT_SEL[0] else "") + f"{ROBOT_NAME[i][0:2]}={np.degrees(data.qpos[J[ROBOT_J[i]]]):+.0f}°"
+                for i in range(6)),
+            f"夹爪: 指距 {finger_gap()*1000:.0f}mm  锁定: {('无','销轴','夹爪')[['', 'pin', 'gripper'].index(S.attach)] if S.attach in ('', 'pin', 'gripper') else S.attach}"
+            f"  IK误差 {IK_ERR[0]*1000:.0f}mm",
             f"当前: {STEP_NAMES[S.step]}   要求步骤: {S.step_list()}",
             f"插入 {S.insert*1000:.0f}/100mm   上移 {S.lift*1000:.0f}/100mm   "
             f"P {pp:.0f}/90°   Q {qq:+.0f}° → 目标 {S.q_target:+.0f}°",
@@ -675,6 +781,8 @@ while not glfw.window_should_close(window):
         ]
         if pose_buf[0] is not None:
             info.insert(0, f"输入六关节角 J1 J2 J3 J4 J5 J6 (°): {pose_buf[0]}▌  Enter确认 Esc取消")
+        if robot_buf[0] is not None:
+            info.insert(0, f"输入工程臂六关节角 (°): {robot_buf[0]}▌  Enter确认 Esc取消")
         if MEASURE["on"] or MEASURE["A"] is not None:
             ml = f"测量({'开·点取A/B两点' if MEASURE['on'] else '关'}): "
             if MEASURE["A"] is not None:
