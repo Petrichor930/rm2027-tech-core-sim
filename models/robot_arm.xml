@@ -1,0 +1,69 @@
+<mujoco model="robot_arm">
+  <!-- 工程六轴机械臂+夹爪（STEP 拆分生成，勿手改；tools/gen_robot_xml.py 生成） -->
+  <asset>
+    <mesh name="robot_base" file="robot_base.stl"/>
+    <mesh name="robot_l1" file="robot_l1.stl"/>
+    <mesh name="robot_l2" file="robot_l2.stl"/>
+    <mesh name="robot_l3" file="robot_l3.stl"/>
+    <mesh name="robot_l4" file="robot_l4.stl"/>
+    <mesh name="robot_l5" file="robot_l5.stl"/>
+    <mesh name="robot_l6_0" file="robot_l6_0.stl"/>
+    <mesh name="robot_l6_1" file="robot_l6_1.stl"/>
+    <mesh name="robot_gripper" file="robot_gripper.stl"/>
+    <mesh name="robot_fing_a" file="robot_fing_a.stl"/>
+    <mesh name="robot_fing_b" file="robot_fing_b.stl"/>
+    <material name="m_robot_base" rgba="0.55 0.32 0.14 1"/>
+    <material name="m_robot_l1" rgba="0.85 0.45 0.12 1"/>
+    <material name="m_robot_l2" rgba="0.9 0.5 0.15 1"/>
+    <material name="m_robot_l3" rgba="0.35 0.35 0.38 1"/>
+    <material name="m_robot_l4" rgba="0.85 0.45 0.12 1"/>
+    <material name="m_robot_l5" rgba="0.3 0.3 0.33 1"/>
+    <material name="m_robot_l6" rgba="0.42 0.42 0.46 1"/>
+    <material name="m_robot_gripper" rgba="0.28 0.28 0.3 1"/>
+    <material name="m_robot_fing_a" rgba="0.85 0.62 0.2 1"/>
+    <material name="m_robot_fing_b" rgba="0.85 0.62 0.2 1"/>
+  </asset>
+  <worldbody>
+    <body name="rb_base" pos="-0.13 -0.6 0.25">
+      <geom name="rb_platform" type="box" size="0.22 0.22 0.125" pos="0 0 -0.125" rgba="0.35 0.32 0.3 1"/>
+      <geom type="mesh" mesh="robot_base" material="m_robot_base"/>
+      <body name="rb_j1" pos="0 0 0">
+        <joint name="j_r1" type="hinge" axis="0 0 1" pos="0 0 0.0092" range="-180 180"/>
+        <geom type="mesh" mesh="robot_l1" material="m_robot_l1"/>
+        <body name="rb_j2" pos="0 0 0">
+          <joint name="j_r2" type="hinge" axis="1 -0.0024 0" pos="-0.0135 0 0.0881" range="-120 120"/>
+          <geom type="mesh" mesh="robot_l2" material="m_robot_l2"/>
+          <body name="rb_j3" pos="0 0 0">
+            <joint name="j_r3" type="hinge" axis="1 -0.0024 0" pos="0.0024 0.2593 0.2923" range="-150 150"/>
+            <geom type="mesh" mesh="robot_l3" material="m_robot_l3"/>
+            <body name="rb_j4" pos="0 0 0">
+              <joint name="j_r4" type="hinge" axis="0.0024 0.9995 -0.0311" pos="-0.0042 0.4147 0.3525" range="-180 180"/>
+              <geom type="mesh" mesh="robot_l4" material="m_robot_l4"/>
+              <body name="rb_j5" pos="0 0 0">
+                <joint name="j_r5" type="hinge" axis="1 -0.0024 0" pos="-0.0308 0.4836 0.3503" range="-120 120"/>
+                <geom type="mesh" mesh="robot_l5" material="m_robot_l5"/>
+                <body name="rb_j6" pos="0 0 0">
+                  <joint name="j_r6" type="hinge" axis="0.0024 0.9995 -0.0311" pos="0.0023 0.6152 0.3462" range="-180 180"/>
+                  <geom type="mesh" mesh="robot_l6_0" material="m_robot_l6"/>
+                  <geom type="mesh" mesh="robot_l6_1" material="m_robot_l6"/>
+                  <body name="rb_grip" pos="0 0 0">
+                    <geom type="mesh" mesh="robot_gripper" material="m_robot_gripper"/>
+                    <site name="grasp" pos="0.0023 0.7272 0.342" size="0.012" rgba="0 1 0 0.5"/>
+                    <body name="rb_fing_a" pos="0 0 0">
+                      <joint name="j_rfa" type="slide" axis="0.9999 0.0077 0.007" range="-0.035 0.035"/>
+                      <geom type="mesh" mesh="robot_fing_a" material="m_robot_fing_a"/>
+                    </body>
+                    <body name="rb_fing_b" pos="0 0 0">
+                      <joint name="j_rfb" type="slide" axis="-0.9999 -0.0077 -0.007" range="-0.035 0.035"/>
+                      <geom type="mesh" mesh="robot_fing_b" material="m_robot_fing_b"/>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>

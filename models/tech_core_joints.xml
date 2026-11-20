@@ -1,4 +1,5 @@
 <mujoco model="tech_core_arm">
+  <include file="robot_arm.xml"/>
   <!-- 科技核心六轴机械臂模型（按官方演示视频 + 网格 PCA 拟合的关节轴）：
        J1 底座回转(垂直) → J2 肩俯仰 → J3 肘俯仰 → J4 腕回转 → J5 腕俯仰 → J6 法兰回转 → 鼓
        鼓上带装配柱链：j_slide(滑槽100mm) → j_p(翻板 0..90°) → j_q(自旋 ±90°, 弹簧回正0.3N·m)
