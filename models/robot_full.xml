@@ -59,6 +59,7 @@
       <geom type="mesh" mesh="fb_chassis_9" class="vis" rgba="0.45 0.42 0.4 1"/>
       <geom type="mesh" mesh="fb_chassis_10" class="vis" rgba="0.45 0.42 0.4 1"/>
       <geom name="chassis_col" type="box" size="0.24 0.16 0.02" pos="0 -0.02 0.20" class="dyn" rgba="0 0 0 0"/>
+      <camera name="fpv_car" pos="0 0.30 0.38" xyaxes="1 0 0 0 0.25 1"/>
       <body name="fb_wm1">
         <joint name="j_w1" type="hinge" pos="0.1572 -0.1832 0.1662" axis="-1 0 0" damping="0.05"/>
         <inertial pos="0.1572 -0.1832 0.1662" mass="0.58" diaginertia="0.01 0.01 0.01"/>
@@ -140,6 +141,7 @@
                       <inertial pos="0 0 0" mass="0.6" diaginertia="0.005 0.005 0.005"/>
                       <geom type="mesh" mesh="robot_gripper" class="vis" rgba="0.28 0.28 0.3 1"/>
                       <site name="grasp" pos="0.0023 0.7272 0.342" size="0.012" rgba="0 1 0 0.5"/>
+                      <camera name="fpv_arm" pos="0 0.02 0.12" xyaxes="1 0 0 0 0 1"/>
                       <body name="rb_fing_a" pos="0 0 0">
                         <joint name="j_rfa" type="slide" axis="1 0 0" range="-0.045 0.045" limited="true" damping="0.2"/>
                         <inertial pos="0 0 0" mass="0.3" diaginertia="0.001 0.001 0.001"/>

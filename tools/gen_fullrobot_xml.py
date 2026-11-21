@@ -58,6 +58,7 @@ L.append(f'      <inertial pos="0 0 0.12" mass="{m_c}" diaginertia="4 5 3"/>')
 for nm in meshes.get("fb_chassis", []):
     L.append(f'      <geom type="mesh" mesh="{nm}" class="vis" rgba="0.45 0.42 0.4 1"/>')
 L.append('      <geom name="chassis_col" type="box" size="0.24 0.16 0.02" pos="0 -0.02 0.20" class="dyn" rgba="0 0 0 0"/>')
+L.append('      <camera name="fpv_car" pos="0 0.30 0.38" xyaxes="1 0 0 0 0.25 1"/>')   # 整车前视角
 
 def wheel_body(name, g, joint, axis=(-1, 0, 0), radius=None, ctr=None):
     ctr = ctr if ctr is not None else META.get(g + "_ctr", [0, 0, 0.05])
@@ -137,6 +138,7 @@ for nm in meshes.get("arm", []):
     if nm.startswith("robot_gripper"):
         L.append(f'{indent}  <geom type="mesh" mesh="{nm}" class="vis" rgba="0.28 0.28 0.3 1"/>')
 L.append(f'{indent}  <site name="grasp" pos="{f(grasp[0])} {f(grasp[1])} {f(grasp[2])}" size="0.012" rgba="0 1 0 0.5"/>')
+L.append(f'{indent}  <camera name="fpv_arm" pos="0 0.02 0.12" xyaxes="1 0 0 0 0 1"/>')   # 机械臂图传第一视角（朝夹爪方向）
 for side, jn, ax in (("a", "j_rfa", 1), ("b", "j_rfb", -1)):
     L.append(f'{indent}  <body name="rb_fing_{side}" pos="0 0 0">')
     L.append(f'{indent}    <joint name="{jn}" type="slide" axis="{ax} 0 0" range="-0.045 0.045" limited="true" damping="0.2"/>')

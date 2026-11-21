@@ -242,6 +242,14 @@ def reset_view():
     cam.azimuth = 90
     cam.elevation = -18
 reset_view()
+FPV_CAMS = ["fpv_arm", "fpv_car"]   # 机械臂图传 / 整车前视角（B 键循环，像模拟器第一视角）
+cam_fpv = [-1]                      # -1=自由相机
+def apply_cam_mode():
+    if cam_fpv[0] < 0:
+        cam.type = mujoco.mjtCamera.mjCAMERA_FREE
+    else:
+        cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
+        cam.fixedcamid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_CAMERA, FPV_CAMS[cam_fpv[0]])
 ctx = mujoco.MjrContext(model, mujoco.mjtFontScale.mjFONTSCALE_150)
 HUD_FONT = ImageFont.truetype("C:/Windows/Fonts/msyh.ttc", 22)
 
@@ -251,6 +259,7 @@ MODES = ["unit", "arm", "robot", "drive", "camera"]
 MODE_NAME = {"unit": "能量单元", "arm": "科技核心臂", "robot": "工程臂", "drive": "驾驶", "camera": "相机"}
 DRIVE_SPD = [0.0]      # 轮速目标 rad/s
 DRIVE_STEER = [0.0]    # 差速转向
+STRAFE = [0.0]          # 麦轮横移（简化：侧向力捷径）
 LIFT_TGT = [0.0]       # 升降目标 m (0=收, 上正)
 LOCK_NAMES = ['j1','j2','j3','j4','j5','j6','j_slide','j_p','j_q',
               'j_r1','j_r2','j_r3','j_r4','j_r5','j_r6','j_rfa','j_rfb']
@@ -474,7 +483,7 @@ HELP = ("Tab=切换(能量单元/科技核心臂/工程臂/驾驶/相机)  1/2/3
         "装配: W/S=插入·上移  A/D=绕P·绕Q  [ ]=指定角度  X=取出  Enter=确认\n"
         "科技核心臂: ←→选关节 ↑↓=±1° R=归零 T=输入角   工程臂: 同左（C=夹爪闭合 O=张开）\n"
         "测量: M=开/关 点击两点出|AB|斜边+Δx/Δy/Δz直角边  N=清测点   视角: V=重置总览\n"
-        "相机: 左键=旋转 右键=平移 滚轮=缩放   Backspace=重置  P=截图  H=HUD  Esc=退出")
+        "驾驶: I/K=前进后退 J/L=转向 Q/E=横移 U/O=抬升   相机: 左键=旋转 右键=平移 滚轮=缩放 B=图传视角 V=总览  P=截图 H=HUD Esc=退出")
 
 RENDER_SCALE = 1   # 全分辨率渲染；HUD 只读写顶部条带，不动整帧（避免角落残留/画中画）
 
@@ -526,7 +535,7 @@ while not glfw.window_should_close(window):
             pending.clear()
 
     if glfw.KEY_ESCAPE in pending: break
-    if glfw.KEY_TAB in pending: mode[0] = (mode[0]+1) % 4
+    if glfw.KEY_TAB in pending: mode[0] = (mode[0]+1) % 5   # 5 档含相机
     if glfw.KEY_H in pending: show_hud[0] = not show_hud[0]
     if glfw.KEY_T in pending and pose_buf[0] is None and robot_buf[0] is None:
         if MODES[mode[0]] == "robot":
@@ -568,7 +577,15 @@ while not glfw.window_should_close(window):
         print("[Backspace] 全部重置（含视角）")
     if glfw.KEY_V in pending:
         reset_view()
-        print("[V] 视角已重置为总览")
+        cam_fpv[0] = -1
+        apply_cam_mode()
+        print("[V] 视角已重置为总览（自由相机）")
+    if glfw.KEY_B in pending:
+        cam_fpv[0] += 1
+        if cam_fpv[0] >= len(FPV_CAMS):
+            cam_fpv[0] = -1
+        apply_cam_mode()
+        print("[B] 相机 ->", "自由视角" if cam_fpv[0] < 0 else ("机械臂图传" if cam_fpv[0] == 0 else "整车前视角"))
     if glfw.KEY_P in pending:
         fbw, fbh = glfw.get_framebuffer_size(window)
         rgb = np.empty((fbh, fbw, 3), dtype=np.uint8)
@@ -753,14 +770,20 @@ while not glfw.window_should_close(window):
         if keys(glfw.KEY_J): DRIVE_STEER[0] = min(12.0, DRIVE_STEER[0] + 0.5)
         if keys(glfw.KEY_L): DRIVE_STEER[0] = max(-12.0, DRIVE_STEER[0] - 0.5)
         if not (keys(glfw.KEY_J) or keys(glfw.KEY_L)): DRIVE_STEER[0] *= 0.92
-        if keys(glfw.KEY_U): LIFT_TGT[0] = min(0.15, LIFT_TGT[0] + 0.002)
-        if keys(glfw.KEY_O): LIFT_TGT[0] = max(0.0, LIFT_TGT[0] - 0.002)
+        if keys(glfw.KEY_Q): STRAFE[0] = min(8.0, STRAFE[0] + 0.5)    # 麦轮横移左
+        if keys(glfw.KEY_E): STRAFE[0] = max(-8.0, STRAFE[0] - 0.5)   # 麦轮横移右
+        if not (keys(glfw.KEY_Q) or keys(glfw.KEY_E)): STRAFE[0] *= 0.92
+        if keys(glfw.KEY_U): LIFT_TGT[0] = min(0.25, LIFT_TGT[0] + 0.005)
+        if keys(glfw.KEY_O): LIFT_TGT[0] = max(0.0, LIFT_TGT[0] - 0.005)
         for k in range(4):
             data.ctrl[k] = DRIVE_SPD[0] + DRIVE_STEER[0] * (1 if k % 2 == 0 else -1)
         data.ctrl[4] = DRIVE_SPD[0] * 0.6   # 前小轮
         data.ctrl[5] = DRIVE_SPD[0] * 0.6   # 后小轮
         data.ctrl[6] = LIFT_TGT[0]
         data.ctrl[7] = LIFT_TGT[0]
+        # 麦轮横移：简化接触无滚子，用侧向力捷径实现（已知限制）
+        data.qfrc_applied[:] = 0.0
+        data.qfrc_applied[JD['j_free']] = -STRAFE[0] * 150.0
         saved = data.qpos[LOCK_ADR].copy()
         for _ in range(2):
             mujoco.mj_step(model, data)

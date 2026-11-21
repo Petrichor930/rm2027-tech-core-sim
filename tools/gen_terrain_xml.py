@@ -71,6 +71,11 @@ from decimate_stl import decimate_tris
 n_before = len(tri)
 tri = decimate_tris(tri, 0.010)
 print(f"视觉网格抽稀: {n_before} -> {len(tri)} tris (cell 10mm)")
+# 走廊视觉裁剪：车行走廊内低矮网格剔除（改用与碰撞完全一致的台面板，根治穿模）
+cent = tri.mean(1)
+corr = (np.abs(cent[:, 0]) < 2.1) & (cent[:, 1] > -3.6) & (cent[:, 1] < -0.2) & (cent[:, 2] < 0.65)
+tri = tri[~corr]
+print(f"走廊裁剪: 去除 {int(corr.sum())} tris（改用碰撞同高台面板）")
 if len(tri) > 180000:
     for ci, chunk in enumerate(np.array_split(tri, int(np.ceil(len(tri)/180000.0)))):
         save_stl(f"assets/terrain_vis_{ci}.stl", chunk)
@@ -98,6 +103,10 @@ L.append(f'    <geom name="field_floor" type="box" size="6 6 0.2" pos="0 0 {G_Z-
 z1 = G_Z + STEP1_H
 L.append(f'    <geom name="step1" type="box" size="{STEP_W/2} {(STEP2_Y-STEP1_Y)/2} {STEP1_H/2}" pos="0 {(STEP1_Y+STEP2_Y)/2} {G_Z+STEP1_H/2}" contype="1" conaffinity="1" friction="1 0.005 0.0002" solref="0.005 1" rgba="0 0 0 0"/>')
 L.append(f'    <geom name="step2" type="box" size="{STEP_W/2} {1.385} {STEP2_H/2}" pos="0 {STEP2_Y+1.385} {z1+STEP2_H/2}" contype="1" conaffinity="1" friction="1 0.005 0.0002" solref="0.005 1" rgba="0 0 0 0"/>')
+# 走廊视觉台面板（与碰撞同高，防止视觉网格穿模；薄板仅作外观）
+L.append(f'    <geom name="vis_floor" type="box" size="2.1 0.865 0.012" pos="0 -2.735 {G_Z-0.012}" material="ground_m" contype="0" conaffinity="0"/>')
+L.append(f'    <geom name="vis_s1" type="box" size="2.1 {(STEP2_Y-STEP1_Y)/2} 0.012" pos="0 {(STEP1_Y+STEP2_Y)/2} {z1-0.012}" material="step_m" contype="0" conaffinity="0"/>')
+L.append(f'    <geom name="vis_s2" type="box" size="2.1 1.385 0.012" pos="0 {STEP2_Y+1.385} {z1+STEP2_H-0.012}" material="step_m" contype="0" conaffinity="0"/>')
 print(f"\n碰撞: G={G_Z}  一级台阶顶={z1:.3f}(y>={STEP1_Y})  二级台阶顶={z1+STEP2_H:.3f}(y>={STEP2_Y})")
 L.append('  </worldbody>')
 L.append('</mujoco>')
