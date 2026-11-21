@@ -69,7 +69,7 @@ for _ in range(300):
 #      +小轮×2(M2006)推进，快走完后杆收起。CAD 中小轮收起高位（高出轮底 218mm），
 #      逼近时前脚已悬于台顶上方，直接落脚台面撑升即可。
 # 踢面 y（gen_terrain_xml 实测）：一级 -1.62(台顶-0.2)，二级 -1.27(台顶0=科技核心安装台)
-RISERS = [(-1.87, -0.2), (-1.27, 0.0)]
+RISERS = [(-2.20, -0.2), (-1.60, 0.0)]
 FEET_UP = -0.25              # 小轮收起位
 shot("climb_00_start.png")
 y0 = float(data.xpos[bid][1])
@@ -100,7 +100,7 @@ for i in range(8000):
     z_tgt = (top - WHEEL_BOT) if top is not None else None
     # ---- 状态机：接近→四杆齐升(前脚台面/后脚地面撑，轮面齐平)→六电机推进→后杆收起 ----
     if phase == "approach":
-        if rs is not None and y_front > rs - 0.03 and abs(vy) < 0.15:
+        if rs is not None and y_front > rs - 0.08 and abs(vy) < 0.15:
             phase, tphase = "lift", 0
     elif phase == "lift":
         if z_tgt is not None and (zc >= z_tgt - 0.01 or tphase > 3500):
@@ -114,7 +114,7 @@ for i in range(8000):
     # ---- 抬升杆控制（bang-bang 目标高度 + 限速 + 垂直速度阻尼）----
     if phase in ("lift", "roll"):
         pred_z = zc + 0.25 * vz
-        aim = 0.25 if (z_tgt is not None and pred_z < z_tgt) else -0.10
+        aim = 0.218         # 几何定值：小轮触台顶时轮底恰与台面齐平（=台阶齐平），M2006 台顶拉车
         fjt = max(min(aim, prev_f + 0.0005), prev_f - 0.003)
         rjt = max(min(aim, prev_r + 0.0005), prev_r - 0.003)
     else:

@@ -15,7 +15,7 @@ META = np.load("assets/robot_full_meta.npy", allow_pickle=True).item()
 ARM = np.load("assets/robot_meta.npy", allow_pickle=True).item()
 OUT = "models/robot_full.xml"
 
-FB_START_POS = (-0.13, -2.4, -0.489)  # 世界初始位：轮底贴 G 面 z=-0.400；一级台阶踢面 y=-1.62 前 0.8m 起跑
+FB_START_POS = (-0.13, -3.0, -0.489)  # 世界初始位：轮底贴 G 面 z=-0.400；一级台阶踢面 y=-1.62 前 0.8m 起跑
 FB_START_YAW = 0.0
 
 files = META["files"]
@@ -91,7 +91,7 @@ for side, gl, gw, jl, jw in (("f", "fb_lift_f", "fb_wheel_f", "j_lift_f", "j_wf"
                               ("r", "fb_lift_r", "fb_wheel_r", "j_lift_r", "j_wr")):
     m_l = masses.get(gl, 4.0)
     L.append(f'      <body name="fb_lift_{side}" pos="0 0 0">')
-    L.append(f'        <joint name="{jl}" type="slide" axis="0 0 -1" range="-0.25 0.30" limited="true" damping="5"/>')
+    L.append(f'        <joint name="{jl}" type="slide" axis="0 0 -1" range="-0.25 0.45" limited="true" damping="5"/>')
     L.append(f'        <inertial pos="0 0 0" mass="{m_l}" diaginertia="0.02 0.02 0.02"/>')
     for nm in meshes.get(gl, []):
         L.append(f'        <geom type="mesh" mesh="{nm}" class="vis" rgba="0.6 0.55 0.3 1"/>')

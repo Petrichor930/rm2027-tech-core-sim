@@ -44,7 +44,7 @@
     <mesh name="robot_fing_b" file="robot_fing_b.stl"/>
   </asset>
   <worldbody>
-    <body name="fb_chassis" pos="-0.13 -2.4 -0.489" quat="1 0 0 0">
+    <body name="fb_chassis" pos="-0.13 -3.0 -0.489" quat="1 0 0 0">
       <freejoint name="j_free"/>
       <inertial pos="0 0 0.12" mass="48.88" diaginertia="4 5 3"/>
       <geom type="mesh" mesh="fb_chassis_0" class="vis" rgba="0.45 0.42 0.4 1"/>
@@ -89,7 +89,7 @@
         <geom name="fb_wm4_col" type="cylinder" size="0.0769 0.025" pos="-0.1572 0.1832 0.1662" euler="0 90 0" class="dyn" rgba="0 0 0 0"/>
       </body>
       <body name="fb_lift_f" pos="0 0 0">
-        <joint name="j_lift_f" type="slide" axis="0 0 -1" range="-0.25 0.30" limited="true" damping="5"/>
+        <joint name="j_lift_f" type="slide" axis="0 0 -1" range="-0.25 0.45" limited="true" damping="5"/>
         <inertial pos="0 0 0" mass="4.15" diaginertia="0.02 0.02 0.02"/>
         <geom type="mesh" mesh="fb_lift_f" class="vis" rgba="0.6 0.55 0.3 1"/>
         <body name="fb_wheel_f">
@@ -100,7 +100,7 @@
         </body>
       </body>
       <body name="fb_lift_r" pos="0 0 0">
-        <joint name="j_lift_r" type="slide" axis="0 0 -1" range="-0.25 0.30" limited="true" damping="5"/>
+        <joint name="j_lift_r" type="slide" axis="0 0 -1" range="-0.25 0.45" limited="true" damping="5"/>
         <inertial pos="0 0 0" mass="1.82" diaginertia="0.02 0.02 0.02"/>
         <geom type="mesh" mesh="fb_lift_r_0" class="vis" rgba="0.6 0.55 0.3 1"/>
         <geom type="mesh" mesh="fb_lift_r_1" class="vis" rgba="0.6 0.55 0.3 1"/>

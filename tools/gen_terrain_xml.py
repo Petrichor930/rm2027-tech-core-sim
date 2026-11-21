@@ -17,14 +17,14 @@ OUT = "models/terrain.xml"
 # ---- 场地 -> 场景 的对齐（一处可调）----
 # TERRAIN_POS z 使 装配区科技核心安装底座(manifest z=-1241) 落在场景 z=0
 # （与动态科技核心底座法兰 z≈0 对齐；x/y 使装配区围绕科技核心 E≈(-0.129,-0.333,0.793)）
-TERRAIN_POS = (-0.25, -1.62, 1.241)
+TERRAIN_POS = (-0.129, -1.953, 1.241)   # 岛心(H坪对角中点 manifest 0,1624) 对正科技核心 (-0.129,-0.333)
 # ---- 二级台阶参数（规则手册图 4-27 A-A 剖面 + 网格实测）----
 # A-A 标高（相对当地地面 G）：200/300/350/360/400；科技核心安装台 = 400 级。
 # 场景坐标：G=-0.400（高地地面，车行平面）→ 一级台阶 -0.200 → 二级台阶/科技核心台 0.000
 # 台阶踢面 y 位置 = 车行进线(x≈0)上网格实测的立面过渡带
 G_Z = -0.400            # 驾驶地面（A-A 的 G，manifest -1641）
-STEP1_H, STEP1_Y = 0.20, -1.87   # 一级台阶：200mm，踢面 y
-STEP2_H, STEP2_Y = 0.20, -1.27   # 二级台阶：200mm，踢面 y（台顶=科技核心安装台 z=0）
+STEP1_H, STEP1_Y = 0.20, -2.20   # 一级台阶：200mm，踢面 y
+STEP2_H, STEP2_Y = 0.20, -1.60   # 二级台阶：200mm，踢面 y（台顶=科技核心安装台 z=0）
 STEP_W = 4.0            # 台阶宽（覆盖车道走廊）
 
 def load_stl(path):
@@ -57,25 +57,38 @@ for r in big[:18]:
     print(f"  {r['product_name'][:22]:22s}  bbox {np.round(lo,0)} .. {np.round(hi,0)}  跨度 {np.round(hi-lo,0)}")
 
 # ---- 合并视觉网格（mm -> m，平移到场景）----
-# 清理悬空件：整体浮在空中的部件（能量机关转臂组件 z>1.4m 等）剔除；
-# 两侧无人机停机坪（z0≈1.04 板 + 支柱）是真件保留
+# 清理悬空件：整体浮在空中的部件（能量机关转臂组件等）剔除
 FLOAT_Z = 1.00
 keep = [r for r in rows if float(r["bz0"]) * 0.001 + TERRAIN_POS[2] <= FLOAT_Z]
 print(f"悬空件清理: {len(rows)} -> {len(keep)} 件（剔除 {len(rows)-len(keep)} 件 z0>{FLOAT_Z}）")
+# 无人机停机坪不用（用户确认）：两个岛角柱组整体剔除
+PADS = [(-3350, -3850), (2900, 3900)]
+def near_pad(r):
+    cx = (float(r["bx0"]) + float(r["bx1"])) / 2
+    cy = (float(r["by0"]) + float(r["by1"])) / 2
+    return any((cx - px) ** 2 + (cy - py) ** 2 < 2000 ** 2 for px, py in PADS)
+_n0 = len(keep)
+keep = [r for r in keep if not near_pad(r)]
+print(f"停机坪剔除: {_n0} -> {len(keep)} 件")
 tri = np.concatenate([load_stl(os.path.join("assets/terrain_parts", r["stl_file"])) for r in keep])
 pts = tri.reshape(-1, 3) * 0.001 + np.array(TERRAIN_POS)
 tri = pts.reshape(-1, 3, 3)
 # 视觉网格抽稀（10mm 顶点聚类）：地形是背景，原 130 万面会让老显卡每帧数秒
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from decimate_stl import decimate_tris
+from decimate_stl import decimate_tris, drop_small_tris
 n_before = len(tri)
 tri = decimate_tris(tri, 0.010)
 print(f"视觉网格抽稀: {n_before} -> {len(tri)} tris (cell 10mm)")
-# 走廊视觉裁剪：车行走廊内低矮网格剔除（改用与碰撞完全一致的台面板，根治穿模）
-cent = tri.mean(1)
-corr = (np.abs(cent[:, 0]) < 2.1) & (cent[:, 1] > -3.6) & (cent[:, 1] < -0.2) & (cent[:, 2] < 0.65)
-tri = tri[~corr]
-print(f"走廊裁剪: 去除 {int(corr.sum())} tris（改用碰撞同高台面板）")
+# 删碎零件（小连通件 = 螺丝/杂件/抽稀碎渣）
+tri = drop_small_tris(tri, 0.02)
+print(f"碎件清理后: {len(tri)} tris")
+# 车行走廊地面压到碰撞剖面（连续曲面代替独立板件：贴合场地且轮子永不穿模）
+v = tri.reshape(-1, 3)
+inbox = (np.abs(v[:, 0]) < 2.1) & (v[:, 1] > -3.6) & (v[:, 1] < STEP2_Y) & (v[:, 2] < 0.65)
+ys = v[inbox, 1]
+v[inbox, 2] = np.where(ys < STEP1_Y, G_Z, np.where(ys < STEP2_Y, G_Z + STEP1_H, G_Z + STEP1_H + STEP2_H))
+tri = v.reshape(-1, 3, 3)
+print(f"走廊压面: {int(inbox.sum())} 顶点压到碰撞剖面")
 if len(tri) > 180000:
     for ci, chunk in enumerate(np.array_split(tri, int(np.ceil(len(tri)/180000.0)))):
         save_stl(f"assets/terrain_vis_{ci}.stl", chunk)
@@ -103,10 +116,6 @@ L.append(f'    <geom name="field_floor" type="box" size="6 6 0.2" pos="0 0 {G_Z-
 z1 = G_Z + STEP1_H
 L.append(f'    <geom name="step1" type="box" size="{STEP_W/2} {(STEP2_Y-STEP1_Y)/2} {STEP1_H/2}" pos="0 {(STEP1_Y+STEP2_Y)/2} {G_Z+STEP1_H/2}" contype="1" conaffinity="1" friction="1 0.005 0.0002" solref="0.005 1" rgba="0 0 0 0"/>')
 L.append(f'    <geom name="step2" type="box" size="{STEP_W/2} {1.385} {STEP2_H/2}" pos="0 {STEP2_Y+1.385} {z1+STEP2_H/2}" contype="1" conaffinity="1" friction="1 0.005 0.0002" solref="0.005 1" rgba="0 0 0 0"/>')
-# 走廊视觉台面板（与碰撞同高，防止视觉网格穿模；薄板仅作外观）
-L.append(f'    <geom name="vis_floor" type="box" size="2.1 0.865 0.012" pos="0 -2.735 {G_Z-0.012}" material="ground_m" contype="0" conaffinity="0"/>')
-L.append(f'    <geom name="vis_s1" type="box" size="2.1 {(STEP2_Y-STEP1_Y)/2} 0.012" pos="0 {(STEP1_Y+STEP2_Y)/2} {z1-0.012}" material="step_m" contype="0" conaffinity="0"/>')
-L.append(f'    <geom name="vis_s2" type="box" size="2.1 1.385 0.012" pos="0 {STEP2_Y+1.385} {z1+STEP2_H-0.012}" material="step_m" contype="0" conaffinity="0"/>')
 print(f"\n碰撞: G={G_Z}  一级台阶顶={z1:.3f}(y>={STEP1_Y})  二级台阶顶={z1+STEP2_H:.3f}(y>={STEP2_Y})")
 L.append('  </worldbody>')
 L.append('</mujoco>')

@@ -57,11 +57,50 @@ def decimate_tris(tri, cell):
     return verts[f].astype(np.float64)
 
 
+def drop_small_tris(tri, min_area, weld=0.004):
+    """删除小连通件（碎零件）：顶点焊接后按连通域算面积，去掉总面积 < min_area 的件"""
+    from collections import defaultdict
+    if len(tri) == 0:
+        return tri
+    v = tri.reshape(-1, 3)
+    key = np.round(v / weld).astype(np.int64)
+    uniq, inv = np.unique(key, axis=0, return_inverse=True)
+    f = inv.reshape(-1, 3)
+    parent = np.arange(len(uniq))
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+    for a, b, c in f:
+        ra, rb, rc = find(int(a)), find(int(b)), find(int(c))
+        if ra != rb:
+            parent[rb] = ra
+        if ra != rc:
+            parent[rc] = ra
+    roots = np.array([find(int(i)) for i in range(len(uniq))])
+    troot = roots[f[:, 0]]
+    area = np.linalg.norm(np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]), axis=1) / 2
+    comp = defaultdict(float)
+    for r, a_ in zip(troot, area):
+        comp[r] += a_
+    keep = np.array([comp[r] >= min_area for r in troot])
+    return tri[keep]
+
+
 if __name__ == "__main__":
-    cell_mm = float(sys.argv[1])
-    cell = cell_mm * 0.001
-    for p in sys.argv[2:]:
-        tri = load_stl(p)
-        out = decimate_tris(tri, cell)
-        save_stl(p, out)
-        print(f"{os.path.basename(p)}: {len(tri)} -> {len(out)} tris (cell {cell_mm}mm)")
+    if sys.argv[1] == "--min-area-cm2":
+        min_area = float(sys.argv[2]) * 1e-4
+        for p in sys.argv[3:]:
+            tri = load_stl(p)
+            out = drop_small_tris(tri, min_area)
+            save_stl(p, out)
+            print(f"{os.path.basename(p)}: {len(tri)} -> {len(out)} tris (删小于 {sys.argv[2]}cm2 的连通件)")
+    else:
+        cell_mm = float(sys.argv[1])
+        cell = cell_mm * 0.001
+        for p in sys.argv[2:]:
+            tri = load_stl(p)
+            out = decimate_tris(tri, cell)
+            save_stl(p, out)
+            print(f"{os.path.basename(p)}: {len(tri)} -> {len(out)} tris (cell {cell_mm}mm)")
