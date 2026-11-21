@@ -88,11 +88,11 @@ L.append('  <worldbody>')
 for i in range(len(vis_files)):
     L.append(f'    <geom type="mesh" mesh="tv{i}" material="ground_m" contype="0" conaffinity="0"/>')
 # 驾驶大平面（A-A 的 G，车在其上行驶）
-L.append(f'    <geom name="field_floor" type="box" size="6 6 0.2" pos="0 0 {G_Z-0.2}" material="ground_m" contype="1" conaffinity="1" friction="1 0.005 0.0002" solref="0.005 1"/>')
+L.append(f'    <geom name="field_floor" type="box" size="6 6 0.2" pos="0 0 {G_Z-0.2}" contype="1" conaffinity="1" friction="1 0.005 0.0002" solref="0.005 1" rgba="0 0 0 0"/>')
 # 二级台阶盒体（图 4-27 A-A：级高 200mm×2；踢面 y 实测于车行进线）
 z1 = G_Z + STEP1_H
-L.append(f'    <geom name="step1" type="box" size="{STEP_W/2} {(STEP2_Y-STEP1_Y)/2} {STEP1_H/2}" pos="0 {(STEP1_Y+STEP2_Y)/2} {G_Z+STEP1_H/2}" material="step_m" contype="1" conaffinity="1" friction="1 0.005 0.0002" solref="0.005 1"/>')
-L.append(f'    <geom name="step2" type="box" size="{STEP_W/2} {1.385} {STEP2_H/2}" pos="0 {STEP2_Y+1.385} {z1+STEP2_H/2}" material="step_m" contype="1" conaffinity="1" friction="1 0.005 0.0002" solref="0.005 1"/>')
+L.append(f'    <geom name="step1" type="box" size="{STEP_W/2} {(STEP2_Y-STEP1_Y)/2} {STEP1_H/2}" pos="0 {(STEP1_Y+STEP2_Y)/2} {G_Z+STEP1_H/2}" contype="1" conaffinity="1" friction="1 0.005 0.0002" solref="0.005 1" rgba="0 0 0 0"/>')
+L.append(f'    <geom name="step2" type="box" size="{STEP_W/2} {1.385} {STEP2_H/2}" pos="0 {STEP2_Y+1.385} {z1+STEP2_H/2}" contype="1" conaffinity="1" friction="1 0.005 0.0002" solref="0.005 1" rgba="0 0 0 0"/>')
 print(f"\n碰撞: G={G_Z}  一级台阶顶={z1:.3f}(y>={STEP1_Y})  二级台阶顶={z1+STEP2_H:.3f}(y>={STEP2_Y})")
 L.append('  </worldbody>')
 L.append('</mujoco>')

@@ -57,7 +57,7 @@ m_c = masses.get("fb_chassis", 30.0)
 L.append(f'      <inertial pos="0 0 0.12" mass="{m_c}" diaginertia="4 5 3"/>')
 for nm in meshes.get("fb_chassis", []):
     L.append(f'      <geom type="mesh" mesh="{nm}" class="vis" rgba="0.45 0.42 0.4 1"/>')
-L.append('      <geom name="chassis_col" type="box" size="0.24 0.16 0.02" pos="0 -0.02 0.20" class="dyn" rgba="0.5 0.45 0.4 0.35"/>')
+L.append('      <geom name="chassis_col" type="box" size="0.24 0.16 0.02" pos="0 -0.02 0.20" class="dyn" rgba="0 0 0 0"/>')
 
 def wheel_body(name, g, joint, axis=(-1, 0, 0), radius=None, ctr=None):
     ctr = ctr if ctr is not None else META.get(g + "_ctr", [0, 0, 0.05])
@@ -70,7 +70,7 @@ def wheel_body(name, g, joint, axis=(-1, 0, 0), radius=None, ctr=None):
     out.append(f'        <inertial pos="{f(ctr[0])} {f(ctr[1])} {f(ctr[2])}" mass="{m}" diaginertia="0.01 0.01 0.01"/>')
     for nm in meshes.get(g, []):
         out.append(f'        <geom type="mesh" mesh="{nm}" class="vis" rgba="0.15 0.15 0.17 1"/>')
-    out.append(f'        <geom name="{name}_col" type="cylinder" size="{f(r)} 0.025" pos="{f(ctr[0])} {f(ctr[1])} {f(ctr[2])}" euler="0 90 0" class="dyn" rgba="0.2 0.2 0.2 0.6"/>')
+    out.append(f'        <geom name="{name}_col" type="cylinder" size="{f(r)} 0.025" pos="{f(ctr[0])} {f(ctr[1])} {f(ctr[2])}" euler="0 90 0" class="dyn" rgba="0 0 0 0"/>')
     out.append('      </body>')
     return out
 
@@ -104,7 +104,7 @@ for side, gl, gw, jl, jw in (("f", "fb_lift_f", "fb_wheel_f", "j_lift_f", "j_wf"
     L.append(f'          <inertial pos="{f(px)} {f(py)} {f(pz)}" mass="{m_w}" diaginertia="0.005 0.005 0.005"/>')
     for nm in meshes.get(gw, []):
         L.append(f'          <geom type="mesh" mesh="{nm}" class="vis" rgba="0.15 0.15 0.17 1"/>')
-    L.append(f'          <geom name="wb_{side}_col" type="cylinder" size="{f(r)} 0.02" pos="{f(px)} {f(py)} {f(pz)}" euler="0 90 0" class="dyn" rgba="0.2 0.2 0.2 0.6"/>')
+    L.append(f'          <geom name="wb_{side}_col" type="cylinder" size="{f(r)} 0.02" pos="{f(px)} {f(py)} {f(pz)}" euler="0 90 0" class="dyn" rgba="0 0 0 0"/>')
     L.append('        </body>')
     L.append('      </body>')
 
