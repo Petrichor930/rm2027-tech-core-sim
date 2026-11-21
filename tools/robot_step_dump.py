@@ -36,8 +36,15 @@ def sm(obj, name, *args):
         f = getattr(obj, name)
     return f(*args)
 
-STEP_PATH = sys.argv[1] if len(sys.argv) > 1 else ""
-OUT_PATH = sys.argv[2] if len(sys.argv) > 2 else "output/robot_step_report.txt"
+import argparse
+ap = argparse.ArgumentParser()
+ap.add_argument("step")
+ap.add_argument("--out", default="output/robot_step_report.txt")
+ap.add_argument("--filter", default="", help="仅打印产品名/路径含此关键词的实例")
+ag = ap.parse_args()
+STEP_PATH = ag.step
+OUT_PATH = ag.out
+NAME_FILTER = ag.filter
 if not STEP_PATH or not os.path.exists(STEP_PATH):
     print("[错误] 用法: python tools/robot_step_dump.py <STEP路径> [报告输出路径]")
     sys.exit(1)
@@ -129,6 +136,8 @@ def walk(lab, loc, path, stats):
             walk(ref, nloc, path + "/" + cname, stats)
     else:
         nm = name_of(lab)
+        if NAME_FILTER and NAME_FILTER not in nm and NAME_FILTER not in path:
+            return
         stats["leaves"] += 1
         stats["names"].add(nm)
         shape = sm(st, 'GetShape', lab)

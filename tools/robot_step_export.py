@@ -6,7 +6,7 @@
 运行（Python 3.12 + OCP）：
   python tools/robot_step_export.py "<STEP路径>"
 """
-import sys, os, csv, math
+import sys, os, csv, math, re
 try:
     sys.stdout.reconfigure(encoding='utf-8')
 except Exception:
@@ -38,10 +38,21 @@ def sm(obj, name, *args):
     return f(*args)
 
 
-STEP_PATH = sys.argv[1] if len(sys.argv) > 1 else ""
-OUT_DIR = "assets/robot_parts"
-if not STEP_PATH or not os.path.exists(STEP_PATH):
-    print("[错误] 用法: python tools/robot_step_export.py <STEP路径>")
+import argparse
+ap = argparse.ArgumentParser()
+ap.add_argument("step", help="STEP 文件路径")
+ap.add_argument("--skip-regex", default="", help="产品名匹配则跳过（如机械臂/紧固件）")
+ap.add_argument("--only-regex", default="", help="仅导出产品名匹配的实例（与 --skip-regex 互斥优先）")
+ap.add_argument("--min-tris", type=int, default=40, help="低于该三角数的 solid 丢弃")
+ap.add_argument("--out", default="assets/robot_parts", help="输出目录")
+ag = ap.parse_args()
+STEP_PATH = ag.step
+OUT_DIR = ag.out
+SKIP = re.compile(ag.skip_regex) if ag.skip_regex else None
+ONLY = re.compile(ag.only_regex) if ag.only_regex else None
+MIN_TRIS = ag.min_tris
+if not os.path.exists(STEP_PATH):
+    print("[错误] STEP 文件不存在:", STEP_PATH)
     sys.exit(1)
 os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -180,7 +191,15 @@ cache = {}
 manifest = []
 skipped = 0
 fi = 0
+skipped_names = 0
 for path, nm, si, M, sol in occ_rows:
+    if ONLY is not None:
+        if not (ONLY.search(nm) or ONLY.search(path)):
+            skipped_names += 1
+            continue
+    elif SKIP is not None and SKIP.search(nm):
+        skipped_names += 1
+        continue
     try:
         from OCP.Bnd import Bnd_Box
         from OCP.BRepBndLib import BRepBndLib
@@ -195,7 +214,7 @@ for path, nm, si, M, sol in occ_rows:
         cyls = cyls_of_solid_local(sol)
         cache[key] = (tris, cyls)
     tris, cyls = cache[key]
-    if len(tris) < 40:
+    if len(tris) < MIN_TRIS:
         skipped += 1
         continue
     # 实例变换
@@ -221,5 +240,5 @@ with open(os.path.join(OUT_DIR, "manifest.csv"), "w", newline="", encoding="utf-
     w.writerows(manifest)
 
 tot = sum(int(m[4]) for m in manifest)
-print(f"导出 {fi} 个 STL（跳过 <40 面退化 {skipped} 个），总三角 {tot}")
+print(f"导出 {fi} 个 STL（跳过退化 {skipped} 个，名字过滤 {skipped_names} 个），总三角 {tot}")
 print(f"清单: {os.path.join(OUT_DIR, 'manifest.csv')}（{len(cache)} 个唯一原型）")
