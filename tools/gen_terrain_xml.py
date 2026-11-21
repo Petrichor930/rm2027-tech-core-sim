@@ -57,15 +57,20 @@ for r in big[:18]:
     print(f"  {r['product_name'][:22]:22s}  bbox {np.round(lo,0)} .. {np.round(hi,0)}  跨度 {np.round(hi-lo,0)}")
 
 # ---- 合并视觉网格（mm -> m，平移到场景）----
-tri = np.concatenate([load_stl(os.path.join("assets/terrain_parts", r["stl_file"])) for r in rows])
+# 清理悬空件：整体浮在空中的部件（能量机关转臂组件 z>1.4m 等）剔除；
+# 两侧无人机停机坪（z0≈1.04 板 + 支柱）是真件保留
+FLOAT_Z = 1.00
+keep = [r for r in rows if float(r["bz0"]) * 0.001 + TERRAIN_POS[2] <= FLOAT_Z]
+print(f"悬空件清理: {len(rows)} -> {len(keep)} 件（剔除 {len(rows)-len(keep)} 件 z0>{FLOAT_Z}）")
+tri = np.concatenate([load_stl(os.path.join("assets/terrain_parts", r["stl_file"])) for r in keep])
 pts = tri.reshape(-1, 3) * 0.001 + np.array(TERRAIN_POS)
 tri = pts.reshape(-1, 3, 3)
-# 视觉网格抽稀（25mm 顶点聚类）：地形是背景，原 130 万面会让老显卡每帧数秒
+# 视觉网格抽稀（10mm 顶点聚类）：地形是背景，原 130 万面会让老显卡每帧数秒
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from decimate_stl import decimate_tris
 n_before = len(tri)
-tri = decimate_tris(tri, 0.025)
-print(f"视觉网格抽稀: {n_before} -> {len(tri)} tris (cell 25mm)")
+tri = decimate_tris(tri, 0.010)
+print(f"视觉网格抽稀: {n_before} -> {len(tri)} tris (cell 10mm)")
 if len(tri) > 180000:
     for ci, chunk in enumerate(np.array_split(tri, int(np.ceil(len(tri)/180000.0)))):
         save_stl(f"assets/terrain_vis_{ci}.stl", chunk)
