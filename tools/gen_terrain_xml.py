@@ -60,6 +60,12 @@ for r in big[:18]:
 tri = np.concatenate([load_stl(os.path.join("assets/terrain_parts", r["stl_file"])) for r in rows])
 pts = tri.reshape(-1, 3) * 0.001 + np.array(TERRAIN_POS)
 tri = pts.reshape(-1, 3, 3)
+# 视觉网格抽稀（25mm 顶点聚类）：地形是背景，原 130 万面会让老显卡每帧数秒
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from decimate_stl import decimate_tris
+n_before = len(tri)
+tri = decimate_tris(tri, 0.025)
+print(f"视觉网格抽稀: {n_before} -> {len(tri)} tris (cell 25mm)")
 if len(tri) > 180000:
     for ci, chunk in enumerate(np.array_split(tri, int(np.ceil(len(tri)/180000.0)))):
         save_stl(f"assets/terrain_vis_{ci}.stl", chunk)

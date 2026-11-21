@@ -220,7 +220,7 @@ if not glfw.init():
 glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
 glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
 glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_COMPAT_PROFILE)
-glfw.window_hint(glfw.SAMPLES, 4)
+glfw.window_hint(glfw.SAMPLES, 0)  # 老驱动 MSAA 4x 会把帧率拖到个位数
 window = glfw.create_window(1200, 800, "科技核心-能量单元 六步装配", None, None)
 if not window:
     raise RuntimeError("window creation failed")
