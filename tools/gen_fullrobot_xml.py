@@ -15,7 +15,7 @@ META = np.load("assets/robot_full_meta.npy", allow_pickle=True).item()
 ARM = np.load("assets/robot_meta.npy", allow_pickle=True).item()
 OUT = "models/robot_full.xml"
 
-FB_START_POS = (-0.13, -2.2, 0.089)  # 世界初始位（轮底贴地；台阶前/装配区旁，可调）
+FB_START_POS = (-0.13, -2.4, -0.489)  # 世界初始位：轮底贴 G 面 z=-0.400；一级台阶踢面 y=-1.62 前 0.8m 起跑
 FB_START_YAW = 0.0
 
 files = META["files"]
@@ -29,7 +29,7 @@ L.append('<mujoco model="robot_full">')
 L.append('  <!-- 工程整车（总装1.1 简化）：底盘+麦轮×4+前后升降小轮+机械臂（复用 robot_meta） -->')
 L.append('  <default>')
 L.append('    <default class="dyn">')
-L.append('      <geom contype="1" conaffinity="1" friction="0.8 0.02 0.002"/>')
+L.append('      <geom contype="1" conaffinity="1" friction="0.8 0.02 0.002" solref="0.005 1"/>')
 L.append('    </default>')
 L.append('    <default class="vis">')
 L.append('      <geom contype="0" conaffinity="0"/>')
@@ -54,48 +54,57 @@ cy, sy = np.cos(FB_START_YAW), np.sin(FB_START_YAW)
 L.append(f'    <body name="fb_chassis" pos="{FB_START_POS[0]} {FB_START_POS[1]} {FB_START_POS[2]}" quat="{f(cy)} 0 0 {f(sy)}">')
 L.append('      <freejoint name="j_free"/>')
 m_c = masses.get("fb_chassis", 30.0)
-L.append(f'      <inertial pos="0 0 0.3" mass="{m_c}" diaginertia="3 4 3"/>')
+L.append(f'      <inertial pos="0 0 0.12" mass="{m_c}" diaginertia="4 5 3"/>')
 for nm in meshes.get("fb_chassis", []):
     L.append(f'      <geom type="mesh" mesh="{nm}" class="vis" rgba="0.45 0.42 0.4 1"/>')
-L.append('      <geom name="chassis_col" type="box" size="0.28 0.4 0.02" pos="0 -0.05 0.11" class="dyn" rgba="0.5 0.45 0.4 0.35"/>')
+L.append('      <geom name="chassis_col" type="box" size="0.24 0.16 0.02" pos="0 -0.02 0.20" class="dyn" rgba="0.5 0.45 0.4 0.35"/>')
 
-def wheel_body(name, g, joint, axis=(1, 0, 0), radius=None):
-    ctr = META.get(g + "_ctr", [0, 0, 0.05])
+def wheel_body(name, g, joint, axis=(-1, 0, 0), radius=None, ctr=None):
+    ctr = ctr if ctr is not None else META.get(g + "_ctr", [0, 0, 0.05])
     r = radius if radius is not None else META.get(g + "_r", 0.05)
     out = []
-    out.append(f'      <body name="{name}" pos="{f(ctr[0])} {f(ctr[1])} {f(ctr[2])}">')
-    out.append(f'        <joint name="{joint}" type="hinge" axis="{axis[0]} {axis[1]} {axis[2]}" damping="0.05"/>')
+    # 网格为车体系绝对坐标：body 放原点、铰/惯量/碰撞放轮心（碰撞随铰自转不公转）
+    out.append(f'      <body name="{name}">')
+    out.append(f'        <joint name="{joint}" type="hinge" pos="{f(ctr[0])} {f(ctr[1])} {f(ctr[2])}" axis="{axis[0]} {axis[1]} {axis[2]}" damping="0.05"/>')
     m = masses.get(g, 1.5)
-    out.append(f'        <inertial pos="0 0 0" mass="{m}" diaginertia="0.01 0.01 0.01"/>')
+    out.append(f'        <inertial pos="{f(ctr[0])} {f(ctr[1])} {f(ctr[2])}" mass="{m}" diaginertia="0.01 0.01 0.01"/>')
     for nm in meshes.get(g, []):
         out.append(f'        <geom type="mesh" mesh="{nm}" class="vis" rgba="0.15 0.15 0.17 1"/>')
-    out.append(f'        <geom name="{name}_col" type="cylinder" size="{f(r)} 0.025" euler="0 90 0" class="dyn" rgba="0.2 0.2 0.2 0.6"/>')
+    out.append(f'        <geom name="{name}_col" type="cylinder" size="{f(r)} 0.025" pos="{f(ctr[0])} {f(ctr[1])} {f(ctr[2])}" euler="0 90 0" class="dyn" rgba="0.2 0.2 0.2 0.6"/>')
     out.append('      </body>')
     return out
 
-# 麦轮×4（悬挂 v1 刚性：直接挂车体）
+# 麦轮×4（悬挂 v1 刚性：直接挂车体）；轮位对称化（分组包围盒有偏，等速会打转）
+_wctr = [META.get(f"fb_wheel_m{k}_ctr", [0, 0, 0.08]) for k in range(1, 5)]
+_ax = float(np.mean([abs(c[0]) for c in _wctr]))
+_ay = float(np.mean([abs(c[1]) for c in _wctr]))
+_zw = float(np.mean([c[2] for c in _wctr]))
 for k in range(1, 5):
-    L += wheel_body(f"fb_wm{k}", f"fb_wheel_m{k}", f"j_w{k}")
+    c = _wctr[k-1]
+    cx = _ax if c[0] > 0 else -_ax
+    cy = _ay if c[1] > 0 else -_ay
+    L += wheel_body(f"fb_wm{k}", f"fb_wheel_m{k}", f"j_w{k}", ctr=(cx, cy, _zw))
 
-# 前后升降滑架 -> 小轮
+# 前后升降滑架 -> 小轮（抬升杆：4×3508 升降 + 小轮 2×M2006 驱动；CAD 中小轮为收起高位）
 for side, gl, gw, jl, jw in (("f", "fb_lift_f", "fb_wheel_f", "j_lift_f", "j_wf"),
                               ("r", "fb_lift_r", "fb_wheel_r", "j_lift_r", "j_wr")):
-    stroke = META.get(gl + "_stroke", 0.12)
     m_l = masses.get(gl, 4.0)
     L.append(f'      <body name="fb_lift_{side}" pos="0 0 0">')
-    L.append(f'        <joint name="{jl}" type="slide" axis="0 0 -1" range="0 {f(stroke)}" limited="true" damping="5"/>')
+    L.append(f'        <joint name="{jl}" type="slide" axis="0 0 -1" range="-0.25 0.30" limited="true" damping="5"/>')
     L.append(f'        <inertial pos="0 0 0" mass="{m_l}" diaginertia="0.02 0.02 0.02"/>')
     for nm in meshes.get(gl, []):
         L.append(f'        <geom type="mesh" mesh="{nm}" class="vis" rgba="0.6 0.55 0.3 1"/>')
-    ctr = META.get(gw + "_ctr", [0, 0, 0.05])
-    r = META.get(gw + "_r", 0.05)
-    L.append(f'        <body name="fb_wheel_{side}" pos="{f(ctr[0]-0)} {f(ctr[1])} {f(ctr[2])}">')
-    L.append(f'          <joint name="{jw}" type="hinge" axis="1 0 0" damping="0.05"/>')
+    ctr = META.get(gw + "_ctr", [0, 0.289, 0.339])
+    r = META.get(gw + "_r", 0.032)
+    # 小轮铰/碰撞 = CAD 轮心（网格绝对坐标，body 放原点）：收起时轮底高出轮底面 218mm（实车收起态）
+    px, py, pz = 0.0, float(ctr[1]), float(ctr[2])
+    L.append(f'        <body name="fb_wheel_{side}">')
+    L.append(f'          <joint name="{jw}" type="hinge" pos="{f(px)} {f(py)} {f(pz)}" axis="-1 0 0" damping="0.05"/>')
     m_w = masses.get(gw, 1.0)
-    L.append(f'          <inertial pos="0 0 0" mass="{m_w}" diaginertia="0.005 0.005 0.005"/>')
+    L.append(f'          <inertial pos="{f(px)} {f(py)} {f(pz)}" mass="{m_w}" diaginertia="0.005 0.005 0.005"/>')
     for nm in meshes.get(gw, []):
         L.append(f'          <geom type="mesh" mesh="{nm}" class="vis" rgba="0.15 0.15 0.17 1"/>')
-    L.append(f'          <geom name="wb_{side}_col" type="cylinder" size="{f(r)} 0.02" euler="0 90 0" class="vis" rgba="0.2 0.2 0.2 0.6"/>')
+    L.append(f'          <geom name="wb_{side}_col" type="cylinder" size="{f(r)} 0.02" pos="{f(px)} {f(py)} {f(pz)}" euler="0 90 0" class="dyn" rgba="0.2 0.2 0.2 0.6"/>')
     L.append('        </body>')
     L.append('      </body>')
 
@@ -105,7 +114,7 @@ ARM_MOUNT_YAW = 0.0    # 臂朝车头(+Y)（robot_meta 的 flange +Y 约定）
 ay = np.radians(ARM_MOUNT_YAW)
 acy, asy = np.cos(ay/2), np.sin(ay/2)
 L.append(f'      <body name="rb_base" pos="{ARM_MOUNT_POS[0]} {ARM_MOUNT_POS[1]} {ARM_MOUNT_POS[2]}" quat="{f(acy)} 0 0 {f(asy)}">')
-L.append(f'        <inertial pos="0 0 0.1" mass="8" diaginertia="0.2 0.2 0.2"/>')
+L.append(f'        <inertial pos="0 0 0.08" mass="6" diaginertia="0.15 0.15 0.15"/>')
 for nm in meshes.get("arm", []):
     if nm.startswith("robot_base"):
         L.append(f'        <geom type="mesh" mesh="{nm}" class="vis" rgba="0.55 0.32 0.14 1"/>')
@@ -144,11 +153,11 @@ for _ in range(len(chain) + 2):   # 关 grip 外的 r6..r1 + rb_base + fb_chassi
 L.append('  </worldbody>')
 L.append('  <actuator>')
 for k in range(1, 5):
-    L.append(f'    <velocity name="a_w{k}" joint="j_w{k}" kv="8" forcerange="-12 12"/>')
+    L.append(f'    <velocity name="a_w{k}" joint="j_w{k}" kv="10" forcerange="-20 20"/>')
 L.append('    <velocity name="a_wf" joint="j_wf" kv="4" forcerange="-3 3"/>')
 L.append('    <velocity name="a_wr" joint="j_wr" kv="4" forcerange="-3 3"/>')
-L.append('    <position name="a_liftf" joint="j_lift_f" kp="200" forcerange="-400 400"/>')
-L.append('    <position name="a_liftr" joint="j_lift_r" kp="200" forcerange="-400 400"/>')
+L.append('    <position name="a_liftf" joint="j_lift_f" kp="100000" kv="3000" forcerange="-700 700"/>')
+L.append('    <position name="a_liftr" joint="j_lift_r" kp="100000" kv="3000" forcerange="-700 700"/>')
 L.append('  </actuator>')
 L.append('</mujoco>')
 

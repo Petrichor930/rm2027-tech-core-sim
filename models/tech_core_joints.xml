@@ -1,5 +1,6 @@
 <mujoco model="tech_core_arm">
   <include file="robot_full.xml"/>
+  <include file="terrain.xml"/>
   <!-- 科技核心六轴机械臂模型（按官方演示视频 + 网格 PCA 拟合的关节轴）：
        J1 底座回转(垂直) → J2 肩俯仰 → J3 肘俯仰 → J4 腕回转 → J5 腕俯仰 → J6 法兰回转 → 鼓
        鼓上带装配柱链：j_slide(滑槽100mm) → j_p(翻板 0..90°) → j_q(自旋 ±90°, 弹簧回正0.3N·m)
@@ -42,12 +43,17 @@
   <worldbody>
     <light name="key" pos="0 -3 4" dir="0 0 -1" diffuse="0.9 0.9 0.9" specular="0.2 0.2 0.2"/>
     <light name="fill" pos="2 2 3" diffuse="0.4 0.4 0.4"/>
-    <light name="amb" pos="0 0 5" diffuse="0.5 0.5 0.5"/>
-    <light name="fill2" pos="-3 -2 2.5" diffuse="0.5 0.5 0.5"/>
-    <light name="fill3" pos="2 -3 1.5" diffuse="0.45 0.45 0.45"/>
-    <light name="back" pos="-2 2 3" diffuse="0.4 0.4 0.4"/>
+    <light name="amb" pos="0 0 6" diffuse="0.7 0.7 0.7" dir="0 0 -1"/>
+    <light name="fill2" pos="-4 -4 5" diffuse="0.7 0.7 0.7" dir="0.5 0.5 -1"/>
+    <light name="fill3" pos="4 -4 5" diffuse="0.7 0.7 0.7" dir="-0.5 0.5 -1"/>
+    <light name="back" pos="-4 4 5" diffuse="0.6 0.6 0.6" dir="0.5 -0.5 -1"/>
+    <light name="back2" pos="4 4 5" diffuse="0.6 0.6 0.6" dir="-0.5 -0.5 -1"/>
+    <light name="rig1" pos="0 -8 6" diffuse="0.8 0.8 0.8" dir="0 1 -1"/>
+    <light name="rig2" pos="0 8 6" diffuse="0.8 0.8 0.8" dir="0 -1 -1"/>
+    <light name="rig3" pos="-8 0 6" diffuse="0.8 0.8 0.8" dir="1 0 -1"/>
+    <light name="rig4" pos="8 0 6" diffuse="0.8 0.8 0.8" dir="-1 0 -1"/>
     <camera name="cam" pos="0 -2.5 1.8" xyaxes="1 0 0 0 0.55 0.85"/>
-    <geom name="floor" type="plane" size="4 4 0.1" material="grid" contype="1" conaffinity="1"/>
+    <!-- 地面/台阶碰撞由 terrain.xml 提供（图 4-27 A-A：G=-0.4，二级台阶 2×200mm） -->
 
     <!-- ===== 六轴机械臂 ===== -->
     <body name="arm_base" pos="0 0 0">
