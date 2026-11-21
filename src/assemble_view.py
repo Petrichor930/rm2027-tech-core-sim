@@ -221,7 +221,7 @@ glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
 glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
 glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_COMPAT_PROFILE)
 glfw.window_hint(glfw.SAMPLES, 0)  # 老驱动 MSAA 4x 会把帧率拖到个位数
-window = glfw.create_window(1200, 800, "科技核心-能量单元 六步装配", None, None)
+window = glfw.create_window(1000, 680, "科技核心-能量单元 六步装配", None, None)
 if not window:
     raise RuntimeError("window creation failed")
 glfw.make_context_current(window)
@@ -476,25 +476,24 @@ HELP = ("Tab=切换(能量单元/科技核心臂/工程臂/驾驶/相机)  1/2/3
         "测量: M=开/关 点击两点出|AB|斜边+Δx/Δy/Δz直角边  N=清测点   视角: V=重置总览\n"
         "相机: 左键=旋转 右键=平移 滚轮=缩放   Backspace=重置  P=截图  H=HUD  Esc=退出")
 
-RENDER_SCALE = 2   # 3D 以 1/2 分辨率渲染再放大（老驱动像素填充是帧率瓶颈；HUD 文字全分辨率反而更锐）
+RENDER_SCALE = 1   # 全分辨率渲染；HUD 只读写顶部条带，不动整帧（避免角落残留/画中画）
 
 def render_hud(info_lines):
+    if info_lines is None:
+        return
     fbw, fbh = glfw.get_framebuffer_size(window)
-    hw, hh = max(1, fbw // RENDER_SCALE), max(1, fbh // RENDER_SCALE)
-    rgb = np.empty((hh, hw, 3), dtype=np.uint8)
-    mujoco.mjr_readPixels(rgb, None, mujoco.MjrRect(0, 0, hw, hh), ctx)
-    img = Image.fromarray(rgb[::-1].copy()).convert('RGBA')
-    img = img.resize((fbw, fbh), Image.BILINEAR)
-    if info_lines is not None:
-        overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
-        od = ImageDraw.Draw(overlay)
-        y = 8
-        for ln in (HELP.split('\n') + ['-'*46] + list(info_lines)):
-            od.text((14, y), ln, font=HUD_FONT, fill=(255, 255, 255, 255))
-            y += 28
-        img = Image.alpha_composite(img, overlay)
-    img = img.convert('RGB')
-    mujoco.mjr_drawPixels(np.array(img)[::-1].reshape(-1), None, mujoco.MjrRect(0, 0, fbw, fbh), ctx)
+    lines = HELP.split('\n') + ['-'*46] + list(info_lines)
+    sh = min(fbh, 10 + 28 * len(lines))
+    rect = mujoco.MjrRect(0, fbh - sh, fbw, sh)     # 顶部条带（GL 原点在左下）
+    rgb = np.empty((sh, fbw, 3), dtype=np.uint8)
+    mujoco.mjr_readPixels(rgb, None, rect, ctx)
+    img = Image.fromarray(rgb[::-1].copy())
+    od = ImageDraw.Draw(img)
+    y = 8
+    for ln in lines:
+        od.text((14, y), ln, font=HUD_FONT, fill=(255, 255, 255))
+        y += 28
+    mujoco.mjr_drawPixels(np.array(img)[::-1].reshape(-1), None, rect, ctx)
 
 # ---------- 主循环 ----------
 last_step = [1]
@@ -845,8 +844,6 @@ while not glfw.window_should_close(window):
                 ml += "  点击物体取 B 点"
             info.append(ml)
         render_hud(info)
-    else:
-        render_hud(None)   # HUD 隐藏时仍需走放大合成，否则 3D 只占角落
 
     glfw.swap_buffers(window)
     glfw.poll_events()
