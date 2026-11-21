@@ -265,6 +265,7 @@ LOCK_NAMES = ['j1','j2','j3','j4','j5','j6','j_slide','j_p','j_q',
               'j_r1','j_r2','j_r3','j_r4','j_r5','j_r6','j_rfa','j_rfb']
 LOCK_ADR = np.array([J[j] for j in LOCK_NAMES])
 LOCK_DOF = np.array([model.jnt_dofadr[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, j)] for j in LOCK_NAMES])
+FREE_DOF = model.jnt_dofadr[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, 'j_free')]
 mode = [4]   # 默认相机模式（开局先看环境；Tab 循环切换）
 show_hud = [True]
 pending = set()
@@ -783,7 +784,7 @@ while not glfw.window_should_close(window):
         data.ctrl[7] = LIFT_TGT[0]
         # 麦轮横移：简化接触无滚子，用侧向力捷径实现（已知限制）
         data.qfrc_applied[:] = 0.0
-        data.qfrc_applied[JD['j_free']] = -STRAFE[0] * 150.0
+        data.qfrc_applied[FREE_DOF] = -STRAFE[0] * 150.0
         saved = data.qpos[LOCK_ADR].copy()
         for _ in range(2):
             mujoco.mj_step(model, data)
