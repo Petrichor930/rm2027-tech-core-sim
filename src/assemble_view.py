@@ -243,8 +243,15 @@ HUD_FONT = ImageFont.truetype("C:/Windows/Fonts/msyh.ttc", 22)
 
 last_x, last_y = [0.0], [0.0]
 btn_left, btn_right, btn_middle = [False], [False], [False]
-MODES = ["unit", "arm", "robot", "camera"]
-MODE_NAME = {"unit": "能量单元", "arm": "科技核心臂", "robot": "工程臂", "camera": "相机"}
+MODES = ["unit", "arm", "robot", "drive", "camera"]
+MODE_NAME = {"unit": "能量单元", "arm": "科技核心臂", "robot": "工程臂", "drive": "驾驶", "camera": "相机"}
+DRIVE_SPD = [0.0]      # 轮速目标 rad/s
+DRIVE_STEER = [0.0]    # 差速转向
+LIFT_TGT = [0.0]       # 升降目标 m (0=收, 上正)
+LOCK_NAMES = ['j1','j2','j3','j4','j5','j6','j_slide','j_p','j_q',
+              'j_r1','j_r2','j_r3','j_r4','j_r5','j_r6','j_rfa','j_rfb']
+LOCK_ADR = np.array([J[j] for j in LOCK_NAMES])
+LOCK_DOF = np.array([model.jnt_dofadr[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, j)] for j in LOCK_NAMES])
 mode = [0]
 show_hud = [True]
 pending = set()
@@ -619,8 +626,9 @@ while not glfw.window_should_close(window):
         if keys(glfw.KEY_R):
             zero_robot()
 
-    # ---- 夹爪：C 闭合 / O 张开（任意模式）+ 抓取/释放边沿检测 ----
-    drive_fingers(keys(glfw.KEY_C), keys(glfw.KEY_O))
+    # ---- 夹爪：C 闭合 / O 张开（驾驶模式除外，O=升降降）+ 抓取/释放边沿检测 ----
+    in_drive = MODES[mode[0]] == "drive"
+    drive_fingers(keys(glfw.KEY_C), keys(glfw.KEY_O) and not in_drive)
     if S.attach == "" and keys(glfw.KEY_C):
         uR = quat_to_mat(data.mocap_quat[EU_MOCAP])
         ok_g, dist, gap, ang = grasp_check(model, data, finger_gap(),
@@ -724,7 +732,29 @@ while not glfw.window_should_close(window):
             print(f"[result] {S.result}")
         last_result[0] = S.result
 
-    mujoco.mj_forward(model, data)
+    # ---- 驾驶模式：动力学步进（车轮/升降动，臂与科技核心关节运动学锁定）----
+    if MODES[mode[0]] == "drive":
+        if keys(glfw.KEY_I): DRIVE_SPD[0] = min(25.0, DRIVE_SPD[0] + 0.6)
+        if keys(glfw.KEY_K): DRIVE_SPD[0] = max(-25.0, DRIVE_SPD[0] - 0.6)
+        if not (keys(glfw.KEY_I) or keys(glfw.KEY_K)): DRIVE_SPD[0] *= 0.985
+        if keys(glfw.KEY_J): DRIVE_STEER[0] = min(12.0, DRIVE_STEER[0] + 0.5)
+        if keys(glfw.KEY_L): DRIVE_STEER[0] = max(-12.0, DRIVE_STEER[0] - 0.5)
+        if not (keys(glfw.KEY_J) or keys(glfw.KEY_L)): DRIVE_STEER[0] *= 0.92
+        if keys(glfw.KEY_U): LIFT_TGT[0] = min(0.15, LIFT_TGT[0] + 0.002)
+        if keys(glfw.KEY_O): LIFT_TGT[0] = max(0.0, LIFT_TGT[0] - 0.002)
+        for k in range(4):
+            data.ctrl[k] = DRIVE_SPD[0] + DRIVE_STEER[0] * (1 if k % 2 == 0 else -1)
+        data.ctrl[4] = DRIVE_SPD[0] * 0.6   # 前小轮
+        data.ctrl[5] = DRIVE_SPD[0] * 0.6   # 后小轮
+        data.ctrl[6] = LIFT_TGT[0]
+        data.ctrl[7] = LIFT_TGT[0]
+        saved = data.qpos[LOCK_ADR].copy()
+        for _ in range(2):
+            mujoco.mj_step(model, data)
+            data.qpos[LOCK_ADR] = saved
+            data.qvel[LOCK_DOF] = 0.0
+    else:
+        mujoco.mj_forward(model, data)
 
     # ---- 渲染 ----
     fbw, fbh = glfw.get_framebuffer_size(window)
@@ -770,6 +800,7 @@ while not glfw.window_should_close(window):
             "工程臂: " + "  ".join(
                 (">" if i == ROBOT_SEL[0] else "") + f"{ROBOT_NAME[i][0:2]}={np.degrees(data.qpos[J[ROBOT_J[i]]]):+.0f}°"
                 for i in range(6)),
+            f"驾驶: 轮速 {DRIVE_SPD[0]:+.1f}rad/s  转向 {DRIVE_STEER[0]:+.1f}  升降 {LIFT_TGT[0]*1000:.0f}mm（I/K J/L U/O）",
             f"夹爪: 指距 {finger_gap()*1000:.0f}mm  锁定: {('无','销轴','夹爪')[['', 'pin', 'gripper'].index(S.attach)] if S.attach in ('', 'pin', 'gripper') else S.attach}"
             f"  IK误差 {IK_ERR[0]*1000:.0f}mm",
             f"当前: {STEP_NAMES[S.step]}   要求步骤: {S.step_list()}",
