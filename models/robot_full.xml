@@ -1,0 +1,173 @@
+<mujoco model="robot_full">
+  <!-- 工程整车（总装1.1 简化）：底盘+麦轮×4+前后升降小轮+机械臂（复用 robot_meta） -->
+  <default>
+    <default class="dyn">
+      <geom contype="1" conaffinity="1" friction="0.8 0.02 0.002"/>
+    </default>
+    <default class="vis">
+      <geom contype="0" conaffinity="0"/>
+    </default>
+  </default>
+  <asset>
+    <mesh name="fb_chassis_0" file="fb_chassis_0.stl"/>
+    <mesh name="fb_chassis_1" file="fb_chassis_1.stl"/>
+    <mesh name="fb_chassis_2" file="fb_chassis_2.stl"/>
+    <mesh name="fb_chassis_3" file="fb_chassis_3.stl"/>
+    <mesh name="fb_chassis_4" file="fb_chassis_4.stl"/>
+    <mesh name="fb_chassis_5" file="fb_chassis_5.stl"/>
+    <mesh name="fb_chassis_6" file="fb_chassis_6.stl"/>
+    <mesh name="fb_chassis_7" file="fb_chassis_7.stl"/>
+    <mesh name="fb_chassis_8" file="fb_chassis_8.stl"/>
+    <mesh name="fb_chassis_9" file="fb_chassis_9.stl"/>
+    <mesh name="fb_chassis_10" file="fb_chassis_10.stl"/>
+    <mesh name="fb_lift_f" file="fb_lift_f.stl"/>
+    <mesh name="fb_lift_r_0" file="fb_lift_r_0.stl"/>
+    <mesh name="fb_lift_r_1" file="fb_lift_r_1.stl"/>
+    <mesh name="fb_wheel_f" file="fb_wheel_f.stl"/>
+    <mesh name="fb_wheel_r" file="fb_wheel_r.stl"/>
+    <mesh name="fb_wheel_m1_0" file="fb_wheel_m1_0.stl"/>
+    <mesh name="fb_wheel_m1_1" file="fb_wheel_m1_1.stl"/>
+    <mesh name="fb_wheel_m2_0" file="fb_wheel_m2_0.stl"/>
+    <mesh name="fb_wheel_m2_1" file="fb_wheel_m2_1.stl"/>
+    <mesh name="fb_wheel_m3_0" file="fb_wheel_m3_0.stl"/>
+    <mesh name="fb_wheel_m3_1" file="fb_wheel_m3_1.stl"/>
+    <mesh name="fb_wheel_m4_0" file="fb_wheel_m4_0.stl"/>
+    <mesh name="fb_wheel_m4_1" file="fb_wheel_m4_1.stl"/>
+    <mesh name="robot_base" file="robot_base.stl"/>
+    <mesh name="robot_l1" file="robot_l1.stl"/>
+    <mesh name="robot_l2" file="robot_l2.stl"/>
+    <mesh name="robot_l3" file="robot_l3.stl"/>
+    <mesh name="robot_l4" file="robot_l4.stl"/>
+    <mesh name="robot_l5" file="robot_l5.stl"/>
+    <mesh name="robot_gripper" file="robot_gripper.stl"/>
+    <mesh name="robot_fing_a" file="robot_fing_a.stl"/>
+    <mesh name="robot_fing_b" file="robot_fing_b.stl"/>
+  </asset>
+  <worldbody>
+    <body name="fb_chassis" pos="-0.13 -2.2 0.089" quat="1 0 0 0">
+      <freejoint name="j_free"/>
+      <inertial pos="0 0 0.3" mass="48.88" diaginertia="3 4 3"/>
+      <geom type="mesh" mesh="fb_chassis_0" class="vis" rgba="0.45 0.42 0.4 1"/>
+      <geom type="mesh" mesh="fb_chassis_1" class="vis" rgba="0.45 0.42 0.4 1"/>
+      <geom type="mesh" mesh="fb_chassis_2" class="vis" rgba="0.45 0.42 0.4 1"/>
+      <geom type="mesh" mesh="fb_chassis_3" class="vis" rgba="0.45 0.42 0.4 1"/>
+      <geom type="mesh" mesh="fb_chassis_4" class="vis" rgba="0.45 0.42 0.4 1"/>
+      <geom type="mesh" mesh="fb_chassis_5" class="vis" rgba="0.45 0.42 0.4 1"/>
+      <geom type="mesh" mesh="fb_chassis_6" class="vis" rgba="0.45 0.42 0.4 1"/>
+      <geom type="mesh" mesh="fb_chassis_7" class="vis" rgba="0.45 0.42 0.4 1"/>
+      <geom type="mesh" mesh="fb_chassis_8" class="vis" rgba="0.45 0.42 0.4 1"/>
+      <geom type="mesh" mesh="fb_chassis_9" class="vis" rgba="0.45 0.42 0.4 1"/>
+      <geom type="mesh" mesh="fb_chassis_10" class="vis" rgba="0.45 0.42 0.4 1"/>
+      <geom name="chassis_col" type="box" size="0.28 0.4 0.02" pos="0 -0.05 0.11" class="dyn" rgba="0.5 0.45 0.4 0.35"/>
+      <body name="fb_wm1" pos="0.1948 -0.205 0.1662">
+        <joint name="j_w1" type="hinge" axis="1 0 0" damping="0.05"/>
+        <inertial pos="0 0 0" mass="0.58" diaginertia="0.01 0.01 0.01"/>
+        <geom type="mesh" mesh="fb_wheel_m1_0" class="vis" rgba="0.15 0.15 0.17 1"/>
+        <geom type="mesh" mesh="fb_wheel_m1_1" class="vis" rgba="0.15 0.15 0.17 1"/>
+        <geom name="fb_wm1_col" type="cylinder" size="0.0769 0.025" euler="0 90 0" class="dyn" rgba="0.2 0.2 0.2 0.6"/>
+      </body>
+      <body name="fb_wm2" pos="-0.1196 -0.205 0.1662">
+        <joint name="j_w2" type="hinge" axis="1 0 0" damping="0.05"/>
+        <inertial pos="0 0 0" mass="0.74" diaginertia="0.01 0.01 0.01"/>
+        <geom type="mesh" mesh="fb_wheel_m2_0" class="vis" rgba="0.15 0.15 0.17 1"/>
+        <geom type="mesh" mesh="fb_wheel_m2_1" class="vis" rgba="0.15 0.15 0.17 1"/>
+        <geom name="fb_wm2_col" type="cylinder" size="0.0768 0.025" euler="0 90 0" class="dyn" rgba="0.2 0.2 0.2 0.6"/>
+      </body>
+      <body name="fb_wm3" pos="0.1948 0.1615 0.1662">
+        <joint name="j_w3" type="hinge" axis="1 0 0" damping="0.05"/>
+        <inertial pos="0 0 0" mass="0.69" diaginertia="0.01 0.01 0.01"/>
+        <geom type="mesh" mesh="fb_wheel_m3_0" class="vis" rgba="0.15 0.15 0.17 1"/>
+        <geom type="mesh" mesh="fb_wheel_m3_1" class="vis" rgba="0.15 0.15 0.17 1"/>
+        <geom name="fb_wm3_col" type="cylinder" size="0.0768 0.025" euler="0 90 0" class="dyn" rgba="0.2 0.2 0.2 0.6"/>
+      </body>
+      <body name="fb_wm4" pos="-0.1196 0.1615 0.1662">
+        <joint name="j_w4" type="hinge" axis="1 0 0" damping="0.05"/>
+        <inertial pos="0 0 0" mass="0.74" diaginertia="0.01 0.01 0.01"/>
+        <geom type="mesh" mesh="fb_wheel_m4_0" class="vis" rgba="0.15 0.15 0.17 1"/>
+        <geom type="mesh" mesh="fb_wheel_m4_1" class="vis" rgba="0.15 0.15 0.17 1"/>
+        <geom name="fb_wm4_col" type="cylinder" size="0.0769 0.025" euler="0 90 0" class="dyn" rgba="0.2 0.2 0.2 0.6"/>
+      </body>
+      <body name="fb_lift_f" pos="0 0 0">
+        <joint name="j_lift_f" type="slide" axis="0 0 -1" range="0 0.2" limited="true" damping="5"/>
+        <inertial pos="0 0 0" mass="4.15" diaginertia="0.02 0.02 0.02"/>
+        <geom type="mesh" mesh="fb_lift_f" class="vis" rgba="0.6 0.55 0.3 1"/>
+        <body name="fb_wheel_f" pos="0.0366 0.289 0.3393">
+          <joint name="j_wf" type="hinge" axis="1 0 0" damping="0.05"/>
+          <inertial pos="0 0 0" mass="0.37" diaginertia="0.005 0.005 0.005"/>
+          <geom type="mesh" mesh="fb_wheel_f" class="vis" rgba="0.15 0.15 0.17 1"/>
+          <geom name="wb_f_col" type="cylinder" size="0.0325 0.02" euler="0 90 0" class="vis" rgba="0.2 0.2 0.2 0.6"/>
+        </body>
+      </body>
+      <body name="fb_lift_r" pos="0 0 0">
+        <joint name="j_lift_r" type="slide" axis="0 0 -1" range="0 0.2" limited="true" damping="5"/>
+        <inertial pos="0 0 0" mass="1.82" diaginertia="0.02 0.02 0.02"/>
+        <geom type="mesh" mesh="fb_lift_r_0" class="vis" rgba="0.6 0.55 0.3 1"/>
+        <geom type="mesh" mesh="fb_lift_r_1" class="vis" rgba="0.6 0.55 0.3 1"/>
+        <body name="fb_wheel_r" pos="-0.1999 -0.259 0.0525">
+          <joint name="j_wr" type="hinge" axis="1 0 0" damping="0.05"/>
+          <inertial pos="0 0 0" mass="0.09" diaginertia="0.005 0.005 0.005"/>
+          <geom type="mesh" mesh="fb_wheel_r" class="vis" rgba="0.15 0.15 0.17 1"/>
+          <geom name="wb_r_col" type="cylinder" size="0.011 0.02" euler="0 90 0" class="vis" rgba="0.2 0.2 0.2 0.6"/>
+        </body>
+      </body>
+      <body name="rb_base" pos="0.0 -0.05 0.55" quat="1 0 0 0">
+        <inertial pos="0 0 0.1" mass="8" diaginertia="0.2 0.2 0.2"/>
+        <geom type="mesh" mesh="robot_base" class="vis" rgba="0.55 0.32 0.14 1"/>
+        <body name="rb_r1" pos="0 0 0">
+          <joint name="j_r1" type="hinge" axis="0 0 1" pos="0 0 0.0092" damping="0.5"/>
+          <inertial pos="0 0 0" mass="1.5" diaginertia="0.02 0.02 0.02"/>
+          <geom type="mesh" mesh="robot_l1" class="vis" rgba="0.85 0.45 0.12 1"/>
+          <body name="rb_r2" pos="0 0 0">
+            <joint name="j_r2" type="hinge" axis="1 -0.0024 0" pos="-0.0135 0 0.0881" damping="0.5"/>
+            <inertial pos="0 0 0" mass="1.5" diaginertia="0.02 0.02 0.02"/>
+            <geom type="mesh" mesh="robot_l2" class="vis" rgba="0.85 0.45 0.12 1"/>
+            <body name="rb_r3" pos="0 0 0">
+              <joint name="j_r3" type="hinge" axis="1 -0.0024 0" pos="0.0024 0.2593 0.2923" damping="0.5"/>
+              <inertial pos="0 0 0" mass="1.5" diaginertia="0.02 0.02 0.02"/>
+              <geom type="mesh" mesh="robot_l3" class="vis" rgba="0.85 0.45 0.12 1"/>
+              <body name="rb_r4" pos="0 0 0">
+                <joint name="j_r4" type="hinge" axis="0.0024 0.9995 -0.0311" pos="-0.0042 0.4147 0.3525" damping="0.5"/>
+                <inertial pos="0 0 0" mass="1.5" diaginertia="0.02 0.02 0.02"/>
+                <geom type="mesh" mesh="robot_l4" class="vis" rgba="0.85 0.45 0.12 1"/>
+                <body name="rb_r5" pos="0 0 0">
+                  <joint name="j_r5" type="hinge" axis="1 -0.0024 0" pos="-0.0308 0.4836 0.3503" damping="0.5"/>
+                  <inertial pos="0 0 0" mass="1.5" diaginertia="0.02 0.02 0.02"/>
+                  <geom type="mesh" mesh="robot_l5" class="vis" rgba="0.85 0.45 0.12 1"/>
+                  <body name="rb_r6" pos="0 0 0">
+                    <joint name="j_r6" type="hinge" axis="0.0024 0.9995 -0.0311" pos="0.0023 0.6152 0.3462" damping="0.5"/>
+                    <inertial pos="0 0 0" mass="1.5" diaginertia="0.02 0.02 0.02"/>
+                    <body name="rb_grip" pos="0 0 0">
+                      <inertial pos="0 0 0" mass="0.6" diaginertia="0.005 0.005 0.005"/>
+                      <geom type="mesh" mesh="robot_gripper" class="vis" rgba="0.28 0.28 0.3 1"/>
+                      <site name="grasp" pos="0.0023 0.7272 0.342" size="0.012" rgba="0 1 0 0.5"/>
+                      <body name="rb_fing_a" pos="0 0 0">
+                        <joint name="j_rfa" type="slide" axis="1 0 0" range="-0.045 0.045" limited="true" damping="0.2"/>
+                        <inertial pos="0 0 0" mass="0.3" diaginertia="0.001 0.001 0.001"/>
+                        <geom type="mesh" mesh="robot_fing_a" class="vis" rgba="0.85 0.62 0.2 1"/>
+                      </body>
+                      <body name="rb_fing_b" pos="0 0 0">
+                        <joint name="j_rfb" type="slide" axis="-1 0 0" range="-0.045 0.045" limited="true" damping="0.2"/>
+                        <inertial pos="0 0 0" mass="0.3" diaginertia="0.001 0.001 0.001"/>
+                        <geom type="mesh" mesh="robot_fing_b" class="vis" rgba="0.85 0.62 0.2 1"/>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <velocity name="a_w1" joint="j_w1" kv="8" forcerange="-12 12"/>
+    <velocity name="a_w2" joint="j_w2" kv="8" forcerange="-12 12"/>
+    <velocity name="a_w3" joint="j_w3" kv="8" forcerange="-12 12"/>
+    <velocity name="a_w4" joint="j_w4" kv="8" forcerange="-12 12"/>
+    <velocity name="a_wf" joint="j_wf" kv="4" forcerange="-3 3"/>
+    <velocity name="a_wr" joint="j_wr" kv="4" forcerange="-3 3"/>
+    <position name="a_liftf" joint="j_lift_f" kp="200" forcerange="-400 400"/>
+    <position name="a_liftr" joint="j_lift_r" kp="200" forcerange="-400 400"/>
+  </actuator>
+</mujoco>
