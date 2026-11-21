@@ -234,10 +234,14 @@ except Exception:
 scene = mujoco.MjvScene(model, maxgeom=20000)
 opt = mujoco.MjvOption()
 cam = mujoco.MjvCamera()
-mujoco.mjv_defaultFreeCamera(model, cam)
-cam.distance = 2.4
-cam.azimuth = 120
-cam.elevation = -15
+def reset_view():
+    """重置到清晰总览视角：整车(近景) + 两级台阶 + 科技核心(远景)一屏看全（V 键 / Backspace 触发）"""
+    mujoco.mjv_defaultFreeCamera(model, cam)
+    cam.lookat[:] = [-0.1, -1.3, 0.0]
+    cam.distance = 5.5
+    cam.azimuth = 90
+    cam.elevation = -18
+reset_view()
 ctx = mujoco.MjrContext(model, mujoco.mjtFontScale.mjFONTSCALE_150)
 HUD_FONT = ImageFont.truetype("C:/Windows/Fonts/msyh.ttc", 22)
 
@@ -252,7 +256,7 @@ LOCK_NAMES = ['j1','j2','j3','j4','j5','j6','j_slide','j_p','j_q',
               'j_r1','j_r2','j_r3','j_r4','j_r5','j_r6','j_rfa','j_rfb']
 LOCK_ADR = np.array([J[j] for j in LOCK_NAMES])
 LOCK_DOF = np.array([model.jnt_dofadr[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, j)] for j in LOCK_NAMES])
-mode = [0]
+mode = [4]   # 默认相机模式（开局先看环境；Tab 循环切换）
 show_hud = [True]
 pending = set()
 held = set()
@@ -466,26 +470,31 @@ def reset_assembly(keep_pose=True):
         for j in ARM_J:
             data.qpos[J[j]] = arm_q[ARM_J.index(j)]
 
-HELP = ("Tab=切换(能量单元/科技核心臂/工程臂/相机)  1/2/3/4=难度  F=开始装配  G=自动对准\n"
+HELP = ("Tab=切换(能量单元/科技核心臂/工程臂/驾驶/相机)  1/2/3/4=难度  F=开始装配  G=自动对准\n"
         "装配: W/S=插入·上移  A/D=绕P·绕Q  [ ]=指定角度  X=取出  Enter=确认\n"
         "科技核心臂: ←→选关节 ↑↓=±1° R=归零 T=输入角   工程臂: 同左（C=夹爪闭合 O=张开）\n"
-        "测量: M=开/关 点击两点出|AB|斜边+Δx/Δy/Δz直角边  N=清测点\n"
+        "测量: M=开/关 点击两点出|AB|斜边+Δx/Δy/Δz直角边  N=清测点   视角: V=重置总览\n"
         "相机: 左键=旋转 右键=平移 滚轮=缩放   Backspace=重置  P=截图  H=HUD  Esc=退出")
+
+RENDER_SCALE = 2   # 3D 以 1/2 分辨率渲染再放大（老驱动像素填充是帧率瓶颈；HUD 文字全分辨率反而更锐）
 
 def render_hud(info_lines):
     fbw, fbh = glfw.get_framebuffer_size(window)
-    viewport = mujoco.MjrRect(0, 0, fbw, fbh)
-    rgb = np.empty((fbh, fbw, 3), dtype=np.uint8)
-    mujoco.mjr_readPixels(rgb, None, viewport, ctx)
+    hw, hh = max(1, fbw // RENDER_SCALE), max(1, fbh // RENDER_SCALE)
+    rgb = np.empty((hh, hw, 3), dtype=np.uint8)
+    mujoco.mjr_readPixels(rgb, None, mujoco.MjrRect(0, 0, hw, hh), ctx)
     img = Image.fromarray(rgb[::-1].copy()).convert('RGBA')
-    overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
-    od = ImageDraw.Draw(overlay)
-    y = 8
-    for ln in (HELP.split('\n') + ['-'*46] + info_lines):
-        od.text((14, y), ln, font=HUD_FONT, fill=(255, 255, 255, 255))
-        y += 28
-    img = Image.alpha_composite(img, overlay).convert('RGB')
-    mujoco.mjr_drawPixels(np.array(img)[::-1].reshape(-1), None, viewport, ctx)
+    img = img.resize((fbw, fbh), Image.BILINEAR)
+    if info_lines is not None:
+        overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+        od = ImageDraw.Draw(overlay)
+        y = 8
+        for ln in (HELP.split('\n') + ['-'*46] + list(info_lines)):
+            od.text((14, y), ln, font=HUD_FONT, fill=(255, 255, 255, 255))
+            y += 28
+        img = Image.alpha_composite(img, overlay)
+    img = img.convert('RGB')
+    mujoco.mjr_drawPixels(np.array(img)[::-1].reshape(-1), None, mujoco.MjrRect(0, 0, fbw, fbh), ctx)
 
 # ---------- 主循环 ----------
 last_step = [1]
@@ -556,6 +565,11 @@ while not glfw.window_should_close(window):
         print("[G] 自动对准：开口已对销轴，插入 0mm，按 W 插入")
     if glfw.KEY_BACKSPACE in pending:
         reset_assembly(keep_pose=False)
+        reset_view()
+        print("[Backspace] 全部重置（含视角）")
+    if glfw.KEY_V in pending:
+        reset_view()
+        print("[V] 视角已重置为总览")
     if glfw.KEY_P in pending:
         fbw, fbh = glfw.get_framebuffer_size(window)
         rgb = np.empty((fbh, fbw, 3), dtype=np.uint8)
@@ -756,9 +770,10 @@ while not glfw.window_should_close(window):
     else:
         mujoco.mj_forward(model, data)
 
-    # ---- 渲染 ----
+    # ---- 渲染（3D 半分辨率 -> render_hud 放大合成）----
     fbw, fbh = glfw.get_framebuffer_size(window)
-    viewport = mujoco.MjrRect(0, 0, fbw, fbh)
+    hw, hh = max(1, fbw // RENDER_SCALE), max(1, fbh // RENDER_SCALE)
+    viewport = mujoco.MjrRect(0, 0, hw, hh)
     mujoco.mjv_updateScene(model, data, opt, None, cam, mujoco.mjtCatBit.mjCAT_ALL, scene)
     draw_measure()
     mujoco.mjr_render(viewport, scene, ctx)
@@ -830,6 +845,8 @@ while not glfw.window_should_close(window):
                 ml += "  点击物体取 B 点"
             info.append(ml)
         render_hud(info)
+    else:
+        render_hud(None)   # HUD 隐藏时仍需走放大合成，否则 3D 只占角落
 
     glfw.swap_buffers(window)
     glfw.poll_events()
