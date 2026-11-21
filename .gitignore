@@ -61,3 +61,4 @@ output/
 # STEP 分件缓存（可从原始 STEP 重新生成，几百 MB 不入库）
 assets/full_parts/
 assets/terrain_parts/
+MUJOCO_LOG.TXT
